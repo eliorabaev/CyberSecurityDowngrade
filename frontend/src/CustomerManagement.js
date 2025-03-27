@@ -9,41 +9,77 @@ function CustomerManagement({ successMessage }) {
   
   // State for storing customers
   const [customers, setCustomers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Available internet packages and sectors for dropdowns
   const availablePackages = ["Basic (10 Mbps)", "Standard (50 Mbps)", "Premium (100 Mbps)", "Enterprise (500 Mbps)"];
   const availableSectors = ["North", "South", "East", "West", "Central"];
 
+  // Fetch customers on component mount
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  // Function to fetch customers from API
+  const fetchCustomers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/customers");
+      if (response.ok) {
+        const data = await response.json();
+        setCustomers(data.customers || []);
+      } else {
+        setMessage({ text: "Failed to load customers", type: "error" });
+      }
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      setMessage({ text: "Error connecting to server", type: "error" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle form submission
-  const handleAddCustomer = () => {
+  const handleAddCustomer = async () => {
     // Simple validation
     if (!customerName || !internetPackage || !sector) {
       setMessage({ text: "Please fill in all fields", type: "error" });
       return;
     }
 
-    // Create new customer object
-    const newCustomer = {
-      id: Date.now(), // simple unique ID
-      name: customerName,
-      package: internetPackage,
-      sector: sector,
-      dateAdded: new Date().toLocaleDateString()
-    };
+    try {
+      // Send customer data to API
+      const response = await fetch("http://localhost:8000/customers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: customerName,
+          internet_package: internetPackage,
+          sector: sector
+        })
+      });
 
-    // Add to customers array
-    setCustomers([...customers, newCustomer]);
-    
-    // Clear form and show success message
-    setCustomerName("");
-    setInternetPackage("");
-    setSector("");
-    setMessage({ text: "Customer added successfully!", type: "success" });
-
-    // Clear message after 3 seconds
-    setTimeout(() => {
-      setMessage({ text: "", type: "" });
-    }, 3000);
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Clear form and show success message
+        setCustomerName("");
+        setInternetPackage("");
+        setSector("");
+        setMessage({ text: data.message || "Customer added successfully!", type: "success" });
+        
+        // Refresh the customer list
+        fetchCustomers();
+      } else {
+        const errorData = await response.json();
+        setMessage({ text: errorData.detail || "Failed to add customer", type: "error" });
+      }
+    } catch (error) {
+      console.error("Error adding customer:", error);
+      setMessage({ text: "Error connecting to server", type: "error" });
+    }
   };
 
   // Handle logout
@@ -137,7 +173,9 @@ function CustomerManagement({ successMessage }) {
         <div className="customer-table-container">
           <h2>Customer List</h2>
           
-          {customers.length === 0 ? (
+          {isLoading ? (
+            <p className="loading">Loading customers...</p>
+          ) : customers.length === 0 ? (
             <p className="no-data">No customers added yet</p>
           ) : (
             <table className="customer-table">
@@ -157,9 +195,9 @@ function CustomerManagement({ successMessage }) {
                         {customer.name}
                       </div>
                     </td>
-                    <td>{customer.package}</td>
+                    <td>{customer.internet_package}</td>
                     <td>{customer.sector}</td>
-                    <td>{customer.dateAdded}</td>
+                    <td>{customer.date_added}</td>
                   </tr>
                 ))}
               </tbody>
