@@ -4,6 +4,7 @@ function ChangePassword() {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChangePassword = async () => {
     // Simple validation
@@ -12,29 +13,17 @@ function ChangePassword() {
       return;
     }
 
+    setIsLoading(true);
     try {
-      // Frontend-only implementation for now
-      // In real app, you would send request to the backend
-      
-      // Simulating successful password change
-      setMessage("Password changed successfully!");
-      
-      // After 1 second, redirect back to admin panel with success message
-      setTimeout(() => {
-        // Navigate back to dashboard with success message
-        window.location.href = "/dashboard?message=Password changed successfully!";
-      }, 1000);
-      
-      // When backend is ready, uncomment this code:
-      /*
       const response = await fetch("http://localhost:8000/change-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Include authentication header when available
-          // "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ oldPassword, newPassword })
+        body: JSON.stringify({ 
+          oldPassword: oldPassword, 
+          newPassword: newPassword 
+        })
       });
 
       if (response.ok) {
@@ -44,15 +33,16 @@ function ChangePassword() {
         // After successful password change, redirect back to dashboard
         setTimeout(() => {
           window.location.href = "/dashboard?message=Password changed successfully!";
-        }, 1000);
+        }, 1500);
       } else {
         const errorData = await response.json();
         setMessage(errorData.detail || "Password change failed");
       }
-      */
     } catch (error) {
-      setMessage("An error occurred");
       console.error("Change password error:", error);
+      setMessage("Error connecting to server");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -68,6 +58,7 @@ function ChangePassword() {
           placeholder="Old Password"
           value={oldPassword}
           onChange={(e) => setOldPassword(e.target.value)}
+          disabled={isLoading}
         />
         <input
           type="password"
@@ -75,10 +66,15 @@ function ChangePassword() {
           placeholder="New Password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
+          disabled={isLoading}
         />
 
-        <button className="connect-button" onClick={handleChangePassword}>
-          Update Password
+        <button 
+          className="connect-button" 
+          onClick={handleChangePassword}
+          disabled={isLoading}
+        >
+          {isLoading ? "Updating..." : "Update Password"}
         </button>
 
         <div className="links">
