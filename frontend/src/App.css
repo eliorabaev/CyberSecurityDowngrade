@@ -370,6 +370,53 @@ p {
   }
 }
 
+/* Style for the header buttons container */
+.header-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Style for the change password button */
+.change-password-button {
+  background-color: var(--accent-blue);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.change-password-button:hover {
+  background-color: var(--accent-hover);
+}
+
+/* Update existing logout button to maintain consistent styling */
+.logout-button {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* Responsive adjustments for the header */
+@media (max-width: 640px) {
+  .dashboard-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+  
+  .header-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* For even smaller screens */
 @media (max-width: 480px) {
   .dashboard-header {
@@ -383,3 +430,4 @@ p {
     overflow-x: auto;
   }
 }
+

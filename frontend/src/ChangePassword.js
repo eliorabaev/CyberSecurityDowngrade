@@ -1,21 +1,29 @@
 import React, { useState } from 'react';
 
 function ChangePassword() {
-  const [currentPassword, setCurrentPassword] = useState("");
+  const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
 
   const handleChangePassword = async () => {
     // Simple validation
-    if (newPassword !== confirmPassword) {
-      setMessage("New passwords do not match");
+    if (!oldPassword || !newPassword) {
+      setMessage("Please enter both old and new password");
       return;
     }
 
     try {
       // Frontend-only implementation for now
-      setMessage("Password changed successfully! This is a frontend demo.");
+      // In real app, you would send request to the backend
+      
+      // Simulating successful password change
+      setMessage("Password changed successfully!");
+      
+      // After 1 second, redirect back to admin panel with success message
+      setTimeout(() => {
+        // Navigate back to dashboard with success message
+        window.location.href = "/dashboard?message=Password changed successfully!";
+      }, 1000);
       
       // When backend is ready, uncomment this code:
       /*
@@ -26,12 +34,17 @@ function ChangePassword() {
           // Include authentication header when available
           // "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ currentPassword, newPassword })
+        body: JSON.stringify({ oldPassword, newPassword })
       });
 
       if (response.ok) {
         const data = await response.json();
         setMessage(data.message);
+        
+        // After successful password change, redirect back to dashboard
+        setTimeout(() => {
+          window.location.href = "/dashboard?message=Password changed successfully!";
+        }, 1000);
       } else {
         const errorData = await response.json();
         setMessage(errorData.detail || "Password change failed");
@@ -47,14 +60,14 @@ function ChangePassword() {
     <div className="login-box">
       <div className="form-content">
         <h1>Change Password</h1>
-        <p>Enter your current password and a new password</p>
+        <p>Enter your old password and a new password</p>
 
         <input
           type="password"
           className="input-field"
-          placeholder="Current Password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
+          placeholder="Old Password"
+          value={oldPassword}
+          onChange={(e) => setOldPassword(e.target.value)}
         />
         <input
           type="password"
@@ -63,20 +76,13 @@ function ChangePassword() {
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
-        <input
-          type="password"
-          className="input-field"
-          placeholder="Confirm New Password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-        />
 
         <button className="connect-button" onClick={handleChangePassword}>
           Update Password
         </button>
 
         <div className="links">
-          <a href="/" className="link">Return to Login</a>
+          <a href="/dashboard" className="link">Return to Dashboard</a>
           <span></span> {/* Empty span to maintain the space-between layout */}
         </div>
       </div>

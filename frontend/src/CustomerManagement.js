@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
-function CustomerManagement() {
+function CustomerManagement({ successMessage }) {
   // State for form inputs
   const [customerName, setCustomerName] = useState("");
   const [internetPackage, setInternetPackage] = useState("");
   const [sector, setSector] = useState("");
-  const [message, setMessage] = useState({ text: "", type: "" });
+  const [message, setMessage] = useState({ text: successMessage || "", type: successMessage ? "success" : "" });
   
   // State for storing customers
   const [customers, setCustomers] = useState([]);
@@ -42,7 +42,7 @@ function CustomerManagement() {
 
     // Clear message after 3 seconds
     setTimeout(() => {
-      setMessage("");
+      setMessage({ text: "", type: "" });
     }, 3000);
   };
 
@@ -52,13 +52,33 @@ function CustomerManagement() {
     window.location.href = "/";
   };
 
+  // Handle navigation to change password
+  const handleChangePassword = () => {
+    window.location.href = "/change-password";
+  };
+
+  // Clear success message after 3 seconds if it was passed in
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setMessage({ text: "", type: "" });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h1>Customer Management</h1>
-        <button className="logout-button" onClick={handleLogout}>
-          Logout
-        </button>
+        <div className="header-buttons">
+          <button className="change-password-button" onClick={handleChangePassword}>
+            Change Password
+          </button>
+          <button className="logout-button" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
       </div>
       
       <div className="dashboard-message">

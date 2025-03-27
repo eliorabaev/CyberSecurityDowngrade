@@ -1,21 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-// Import the components we created
+// Import the components
 import Register from './Register';
 import ForgotPassword from './ForgotPassword';
 import ChangePassword from './ChangePassword';
-import CustomerManagement from './CustomerManagement'; // Import the new component
+import CustomerManagement from './CustomerManagement';
 
 function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // New state to track login status
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const handleLogin = async () => {
     try {
       // For demonstration, we'll use a simple check
-      // In a real app, you would validate against your backend
       if (username && password) {
         setIsLoggedIn(true);
         setMessage("Login successful!");
@@ -92,11 +91,26 @@ function Login() {
 }
 
 function App() {
-  // Simple routing logic based on URL path
+  // State to track current path and any success messages
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  // Parse URL for any success messages
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const message = queryParams.get('message');
+    
+    if (message) {
+      setSuccessMessage(message);
+      
+      // Remove the query parameter from the URL without refreshing the page
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [window.location.search]);
 
   // Listen for changes to the URL
-  React.useEffect(() => {
+  useEffect(() => {
     const onLocationChange = () => {
       setCurrentPath(window.location.pathname);
     };
@@ -116,11 +130,11 @@ function App() {
   };
 
   // Override the default behavior of anchor tags
-  React.useEffect(() => {
+  useEffect(() => {
     const handleClick = (e) => {
       // Find the closest anchor tag
       const anchor = e.target.closest('a');
-      if (anchor && anchor.getAttribute('href').startsWith('/')) {
+      if (anchor && anchor.getAttribute('href') && anchor.getAttribute('href').startsWith('/')) {
         e.preventDefault();
         navigate(anchor.getAttribute('href'));
       }
@@ -141,7 +155,7 @@ function App() {
     case '/change-password':
       return <ChangePassword />;
     case '/dashboard':
-      return <CustomerManagement />;
+      return <CustomerManagement successMessage={successMessage} />;
     default:
       return <Login />;
   }
