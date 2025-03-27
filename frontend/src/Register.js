@@ -6,20 +6,22 @@ function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async () => {
     // Simple validation
+    if (!username || !email || !password) {
+      setMessage("Please fill all required fields");
+      return;
+    }
+    
     if (password !== confirmPassword) {
       setMessage("Passwords do not match");
       return;
     }
 
+    setIsLoading(true);
     try {
-      // Frontend-only implementation for now
-      setMessage("Registration successful! This is a frontend demo.");
-      
-      // When backend is ready, uncomment this code:
-      /*
       const response = await fetch("http://localhost:8000/register", {
         method: "POST",
         headers: {
@@ -31,14 +33,26 @@ function Register() {
       if (response.ok) {
         const data = await response.json();
         setMessage(data.message);
+        
+        // Clear fields after successful registration
+        setUsername("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        
+        // Redirect to login page after 2 seconds
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 2000);
       } else {
         const errorData = await response.json();
         setMessage(errorData.detail || "Registration failed");
       }
-      */
     } catch (error) {
-      setMessage("An error occurred");
       console.error("Registration error:", error);
+      setMessage("Error connecting to server");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -54,6 +68,7 @@ function Register() {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          disabled={isLoading}
         />
         <input
           type="email"
@@ -61,6 +76,7 @@ function Register() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          disabled={isLoading}
         />
         <input
           type="password"
@@ -68,6 +84,7 @@ function Register() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          disabled={isLoading}
         />
         <input
           type="password"
@@ -75,10 +92,15 @@ function Register() {
           placeholder="Confirm Password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
+          disabled={isLoading}
         />
 
-        <button className="connect-button" onClick={handleRegister}>
-          Register
+        <button 
+          className="connect-button" 
+          onClick={handleRegister}
+          disabled={isLoading}
+        >
+          {isLoading ? "Registering..." : "Register"}
         </button>
 
         <div className="links">
