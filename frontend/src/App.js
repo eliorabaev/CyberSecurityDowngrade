@@ -4,14 +4,27 @@ import React, { useState } from 'react';
 import Register from './Register';
 import ForgotPassword from './ForgotPassword';
 import ChangePassword from './ChangePassword';
+import CustomerManagement from './CustomerManagement'; // Import the new component
 
 function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // New state to track login status
 
   const handleLogin = async () => {
     try {
+      // For demonstration, we'll use a simple check
+      // In a real app, you would validate against your backend
+      if (username && password) {
+        setIsLoggedIn(true);
+        setMessage("Login successful!");
+      } else {
+        setMessage("Please enter both username and password");
+      }
+      
+      // Commented backend code for future use
+      /*
       const response = await fetch("http://localhost:8000/login", {
         method: "POST",
         headers: {
@@ -23,15 +36,22 @@ function Login() {
       if (response.ok) {
         const data = await response.json();
         setMessage(data.message);
+        setIsLoggedIn(true);
       } else {
         const errorData = await response.json();
         setMessage(errorData.detail || "Login failed");
       }
+      */
     } catch (error) {
       setMessage("An error occurred");
       console.error("Login error:", error);
     }
   };
+
+  // If logged in, redirect to CustomerManagement
+  if (isLoggedIn) {
+    return <CustomerManagement />;
+  }
 
   return (
     <div className="login-box">
@@ -120,6 +140,8 @@ function App() {
       return <ForgotPassword />;
     case '/change-password':
       return <ChangePassword />;
+    case '/dashboard':
+      return <CustomerManagement />;
     default:
       return <Login />;
   }

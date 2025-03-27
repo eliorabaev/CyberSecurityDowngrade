@@ -17,6 +17,10 @@
   --input-bg: #333333;
   --input-text: #ffffff;
   --error-color: #ff6b6b;
+  --success-color: #4BB543;
+  --table-header-bg: #333333;
+  --table-row-even: #2a2a2a;
+  --table-row-odd: #252525;
 }
 
 /* Full-height layout */
@@ -122,6 +126,19 @@ p {
   transition: background-color 0.2s;
 }
 
+/* Button container for the dashboard */
+.button-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.button-container .connect-button {
+  width: auto;
+  min-width: 150px;
+  margin-top: 0;
+}
+
 .connect-button:hover {
   background-color: var(--accent-hover);
 }
@@ -154,5 +171,215 @@ p {
 @media (max-width: 480px) {
   .login-box {
     padding: 30px 20px;
+  }
+}
+
+/* New styles for CustomerManagement component */
+
+/* Dashboard container */
+.dashboard-container {
+  background-color: var(--box-bg);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  width: 1000px; /* Fixed width */
+  margin: 0 auto;
+  border: 1px solid var(--border-color);
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dashboard header with title and logout button */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 24px;
+}
+
+.logout-button {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* Dashboard content area */
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  padding: 30px;
+  flex: 1;
+}
+
+/* Add form styles */
+.customer-form-container {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+.customer-form-container h2 {
+  color: var(--text-primary);
+  font-size: 20px;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+/* Form row for horizontal layout */
+.form-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* Dashboard message area */
+.dashboard-message {
+  padding: 0 30px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+}
+
+.message {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  margin: 0;
+}
+
+.message.success {
+  color: var(--success-color);
+  background-color: rgba(75, 181, 67, 0.1);
+}
+
+.message.error {
+  color: var(--error-color);
+  background-color: rgba(255, 107, 107, 0.1);
+}
+
+/* Table styles */
+.customer-table-container {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 20px;
+  flex: 1;
+}
+
+.customer-table-container h2 {
+  color: var(--text-primary);
+  font-size: 20px;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.customer-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  color: var(--text-primary);
+}
+
+.customer-table th {
+  text-align: left;
+  padding: 12px 15px;
+  background-color: var(--table-header-bg);
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+}
+
+.customer-table .customer-name-col {
+  width: 30%;
+}
+
+.customer-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.customer-name-cell {
+  max-width: 0;
+  overflow: hidden;
+}
+
+.truncate-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.customer-table tr:nth-child(even) {
+  background-color: var(--table-row-even);
+}
+
+.customer-table tr:nth-child(odd) {
+  background-color: var(--table-row-odd);
+}
+
+.no-data {
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 30px 0;
+}
+
+/* Responsive adjustments for dashboard */
+@media (max-width: 1050px) {
+  .dashboard-container {
+    width: 95%;
+    margin: 20px auto;
+  }
+  
+  .dashboard-content {
+    padding: 20px;
+  }
+  
+  .customer-table th,
+  .customer-table td {
+    padding: 10px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .form-group {
+    margin-bottom: 0;
+  }
+}
+
+/* For even smaller screens */
+@media (max-width: 480px) {
+  .dashboard-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 15px;
+  }
+  
+  .customer-table {
+    display: block;
+    overflow-x: auto;
   }
 }
