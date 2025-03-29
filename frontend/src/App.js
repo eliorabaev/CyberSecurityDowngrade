@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import config from './config';
 
 // Import the components
 import Register from './Register';
@@ -14,17 +15,14 @@ function Login() {
 
   const handleLogin = async () => {
     try {
-      // For demonstration, we'll use a simple check
-      if (username && password) {
-        setIsLoggedIn(true);
-        setMessage("Login successful!");
-      } else {
+      // Form validation
+      if (!username || !password) {
         setMessage("Please enter both username and password");
+        return;
       }
       
-      // Commented backend code for future use
-      /*
-      const response = await fetch("http://localhost:8000/login", {
+      // Send login request to backend
+      const response = await fetch(`${config.apiUrl}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -40,9 +38,8 @@ function Login() {
         const errorData = await response.json();
         setMessage(errorData.detail || "Login failed");
       }
-      */
     } catch (error) {
-      setMessage("An error occurred");
+      setMessage("Error connecting to server");
       console.error("Login error:", error);
     }
   };

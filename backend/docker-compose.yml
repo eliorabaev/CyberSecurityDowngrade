@@ -1,0 +1,44 @@
+
+services:
+  # Backend API service
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./:/app  # Mount the current directory to enable code changes
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db  # Override the DB_HOST to point to the Docker service
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    env_file:
+      - .env  # Pull all environment variables from .env file
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${DB_USER}", "-p${DB_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mysql_data:
