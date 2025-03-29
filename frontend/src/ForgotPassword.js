@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import config from './config';
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -11,7 +12,7 @@ function ForgotPassword() {
       
       // When backend is ready, uncomment this code:
       /*
-      const response = await fetch("http://localhost:8000/forgot-password", {
+      const response = await fetch(`${config.apiUrl}/forgot-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

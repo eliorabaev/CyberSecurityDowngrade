@@ -5,13 +5,18 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Foreign
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
-import passlib.hash as hash
+import os
+import time
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Create FastAPI app
 app = FastAPI()
 
 # Allow requests from the React app
-origins = ["http://localhost:3000"]
+origins = [os.getenv("FRONTEND_URL", "http://localhost:3000")]
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,10 +26,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database connection
-# Replace with your actual MySQL credentials
-DATABASE_URL = "mysql+pymysql://root:password@localhost/internet_service_provider"
-engine = create_engine(DATABASE_URL)
+# Database connection from environment variables
+DB_USER = os.getenv("DB_USER", "isp_user")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "dev_password")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "internet_service_provider")
+
+# Create database URL
+DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+
+# Function to attempt database connection with retries
+def connect_with_retry(url, retries=20, delay=3):
+    """Connect to database with retry logic"""
+    print(f"Attempting to connect to database at {DB_HOST}...")
+    
+    for i in range(retries):
+        try:
+            engine = create_engine(url)
+            # Test the connection
+            with engine.connect() as conn:
+                pass
+            print(f"Successfully connected to database at {DB_HOST}")
+            return engine
+        except Exception as e:
+            if i < retries - 1:
+                print(f"Database connection failed. Retrying in {delay} seconds... ({i+1}/{retries})")
+                print(f"Error: {str(e)}")
+                time.sleep(delay)
+            else:
+                print("Maximum retries reached. Could not connect to the database.")
+                print(f"Final error: {str(e)}")
+                raise
+
+# Create engine with retry mechanism
+engine = connect_with_retry(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -35,7 +70,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True)
     email = Column(String(100), unique=True, index=True)
-    password = Column(String(255))  # Will store hashed password
+    password = Column(String(255))  # Will store plain password for now
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -82,7 +117,7 @@ def login(data: LoginData, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == data.username).first()
     
     # Check if user exists and password is correct
-    if not user or not verify_password(data.password, user.password):
+    if not user or user.password != data.password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     return {"message": "Login successful"}
@@ -97,9 +132,8 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(status_code=400, detail="Username or email already registered")
     
-    # Create new user with hashed password
-    hashed_password = get_password_hash(data.password)
-    new_user = User(username=data.username, email=data.email, password=hashed_password)
+    # Create new user with plain password
+    new_user = User(username=data.username, email=data.email, password=data.password)
     
     db.add(new_user)
     db.commit()
@@ -111,11 +145,11 @@ def change_password(data: ChangePasswordData, db: Session = Depends(get_db)):
     # For simplicity, we're using a hardcoded user - in a real app, get the user from session/token
     user = db.query(User).filter(User.username == "admin").first()
     
-    if not user or not verify_password(data.oldPassword, user.password):
+    if not user or user.password != data.oldPassword:
         raise HTTPException(status_code=401, detail="Invalid current password")
     
     # Update password
-    user.password = get_password_hash(data.newPassword)
+    user.password = data.newPassword
     db.commit()
     
     return {"message": "Password changed successfully"}
@@ -151,18 +185,6 @@ def get_customers(db: Session = Depends(get_db)):
     
     return {"customers": customer_list}
 
-# Password helpers
-def get_password_hash(password):
-    return hash.bcrypt.hash(password)
-
-def verify_password(plain_password, hashed_password):
-    try:
-        return hash.bcrypt.verify(plain_password, hashed_password)
-    except:
-        # If the stored password isn't bcrypt-hashed, do a simple compare
-        # (useful for initial testing/setup)
-        return plain_password == hashed_password
-
 # For development/testing: Add initial admin user if not exists
 @app.on_event("startup")
 def create_initial_users():
@@ -173,9 +195,14 @@ def create_initial_users():
             admin_user = User(
                 username="admin",
                 email="admin@example.com",
-                password=get_password_hash("admin")  # In production, use a stronger password
+                password="admin"  # Plain text password for development
             )
             db.add(admin_user)
             db.commit()
     finally:
         db.close()
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("API_PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

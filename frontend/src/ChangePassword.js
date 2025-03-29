@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import config from './config';
 
 function ChangePassword() {
   const [oldPassword, setOldPassword] = useState("");
@@ -15,7 +16,7 @@ function ChangePassword() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/change-password", {
+      const response = await fetch(`${config.apiUrl}/change-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

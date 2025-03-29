@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import config from './config';
 
 function CustomerManagement({ successMessage }) {
   // State for form inputs
@@ -11,9 +12,9 @@ function CustomerManagement({ successMessage }) {
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Available internet packages and sectors for dropdowns
-  const availablePackages = ["Basic (10 Mbps)", "Standard (50 Mbps)", "Premium (100 Mbps)", "Enterprise (500 Mbps)"];
-  const availableSectors = ["North", "South", "East", "West", "Central"];
+  // Available internet packages and sectors for dropdowns from config
+  const availablePackages = config.availablePackages;
+  const availableSectors = config.availableSectors;
 
   // Fetch customers on component mount
   useEffect(() => {
@@ -24,7 +25,7 @@ function CustomerManagement({ successMessage }) {
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/customers");
+      const response = await fetch(`${config.apiUrl}/customers`);
       if (response.ok) {
         const data = await response.json();
         setCustomers(data.customers || []);
@@ -49,7 +50,7 @@ function CustomerManagement({ successMessage }) {
 
     try {
       // Send customer data to API
-      const response = await fetch("http://localhost:8000/customers", {
+      const response = await fetch(`${config.apiUrl}/customers`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
