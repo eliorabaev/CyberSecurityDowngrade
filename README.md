@@ -184,7 +184,3 @@ If the frontend can't connect to the API:
 
 1. Verify the API URL in the frontend's `.env` file
 2. Check CORS settings in `main.py` if you're using different hosts or ports
-
-## License
-
-[Your License Information]
