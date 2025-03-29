@@ -49,8 +49,8 @@ A web application for managing internet service customers with a FastAPI backend
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/eliorabaev/CyberSecurity.git
+cd CyberSecurity
 ```
 
 ### 2. Set up environment variables
