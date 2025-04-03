@@ -4,8 +4,52 @@ import config from './config';
 function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({
+    email: ''
+  });
+  const [touchedFields, setTouchedFields] = useState({
+    email: false
+  });
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      return { isValid: false, errorMessage: "Email is required" };
+    }
+    if (!emailRegex.test(email)) {
+      return { isValid: false, errorMessage: "Please enter a valid email address" };
+    }
+    return { isValid: true, errorMessage: '' };
+  };
+
+  const handleBlur = (field) => {
+    setTouchedFields({
+      ...touchedFields,
+      [field]: true
+    });
+
+    if (field === 'email' && email) {
+      const validation = validateEmail(email);
+      setFieldErrors({...fieldErrors, email: validation.errorMessage});
+    }
+  };
 
   const handleForgotPassword = async () => {
+    // Mark email as touched
+    setTouchedFields({
+      email: true
+    });
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    
+    if (emailValidation.errorMessage) {
+      setFieldErrors({ email: emailValidation.errorMessage });
+      return;
+    }
+
+    setIsLoading(true);
     try {
       // Frontend-only implementation for now
       setMessage("If an account with this email exists, password reset instructions have been sent. This is a frontend demo.");
@@ -31,6 +75,8 @@ function ForgotPassword() {
     } catch (error) {
       setMessage("An error occurred");
       console.error("Forgot password error:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -40,16 +86,27 @@ function ForgotPassword() {
         <h1>Forgot Password</h1>
         <p>Enter your email to receive a password reset link</p>
 
-        <input
-          type="email"
-          className="input-field"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <div className="field-wrapper">
+          <input
+            type="email"
+            className={`input-field ${touchedFields.email && fieldErrors.email ? 'input-error' : ''}`}
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => handleBlur('email')}
+            disabled={isLoading}
+          />
+          {touchedFields.email && fieldErrors.email && 
+            <div className="error-message">{fieldErrors.email}</div>
+          }
+        </div>
 
-        <button className="connect-button" onClick={handleForgotPassword}>
-          Send Reset Link
+        <button 
+          className="connect-button" 
+          onClick={handleForgotPassword}
+          disabled={isLoading}
+        >
+          {isLoading ? "Sending..." : "Send Reset Link"}
         </button>
 
         <div className="links">
