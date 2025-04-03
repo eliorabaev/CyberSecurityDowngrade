@@ -14,12 +14,7 @@ function Register() {
     password: '',
     confirmPassword: ''
   });
-  const [touchedFields, setTouchedFields] = useState({
-    username: false,
-    email: false,
-    password: false,
-    confirmPassword: false
-  });
+  const [formSubmitted, setFormSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const validateEmail = (email) => {
@@ -33,42 +28,67 @@ function Register() {
     return { isValid: true, errorMessage: '' };
   };
 
-  // Mark field as touched when user leaves it
-  const handleBlur = (field) => {
-    setTouchedFields({
-      ...touchedFields,
-      [field]: true
-    });
-
-    // Validate on blur
-    if (field === 'username' && username) {
-      const validation = validateUsername(username);
-      setFieldErrors({...fieldErrors, username: validation.errorMessage});
-    }
-    else if (field === 'email' && email) {
-      const validation = validateEmail(email);
-      setFieldErrors({...fieldErrors, email: validation.errorMessage});
-    }
-    else if (field === 'password' && password) {
-      const validation = validatePassword(password);
-      setFieldErrors({...fieldErrors, password: validation.errorMessage});
-    }
-    else if (field === 'confirmPassword' && confirmPassword) {
-      if (password) {
-        const validation = validatePasswordMatch(password, confirmPassword);
-        setFieldErrors({...fieldErrors, confirmPassword: validation.errorMessage});
+  // Handle changes to username (clear error when validation passes)
+  const handleUsernameChange = (e) => {
+    const value = e.target.value;
+    setUsername(value);
+    
+    // If form was submitted and there was an error that's now fixed
+    if (formSubmitted && fieldErrors.username) {
+      const validation = validateUsername(value);
+      if (validation.isValid) {
+        setFieldErrors({...fieldErrors, username: ''});
       }
     }
   };
 
+  // Handle changes to email (clear error when validation passes)
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    setEmail(value);
+    
+    // If form was submitted and there was an error that's now fixed
+    if (formSubmitted && fieldErrors.email) {
+      const validation = validateEmail(value);
+      if (validation.isValid) {
+        setFieldErrors({...fieldErrors, email: ''});
+      }
+    }
+  };
+
+  // Handle changes to password (clear error when validation passes)
+  const handlePasswordChange = (e) => {
+    const value = e.target.value;
+    setPassword(value);
+    
+    // If form was submitted and there was an error that's now fixed
+    if (formSubmitted && fieldErrors.password) {
+      const validation = validatePassword(value);
+      if (validation.isValid) {
+        setFieldErrors({...fieldErrors, password: ''});
+      }
+    }
+    
+    // Also check if confirm password error should be cleared
+    if (formSubmitted && fieldErrors.confirmPassword && value === confirmPassword) {
+      setFieldErrors(prev => ({...prev, confirmPassword: ''}));
+    }
+  };
+
+  // Handle changes to confirm password (clear error when matches)
+  const handleConfirmPasswordChange = (e) => {
+    const value = e.target.value;
+    setConfirmPassword(value);
+    
+    // If form was submitted and there was an error that's now fixed
+    if (formSubmitted && fieldErrors.confirmPassword && value === password) {
+      setFieldErrors({...fieldErrors, confirmPassword: ''});
+    }
+  };
+
   const handleRegister = async () => {
-    // Mark all fields as touched
-    setTouchedFields({
-      username: true,
-      email: true,
-      password: true,
-      confirmPassword: true
-    });
+    // Mark form as submitted to show validation errors
+    setFormSubmitted(true);
 
     // Validate all fields before submission
     const usernameValidation = validateUsername(username);
@@ -116,12 +136,7 @@ function Register() {
           password: '',
           confirmPassword: ''
         });
-        setTouchedFields({
-          username: false,
-          email: false,
-          password: false,
-          confirmPassword: false
-        });
+        setFormSubmitted(false);
         
         // Redirect to login page after 2 seconds
         setTimeout(() => {
@@ -148,14 +163,13 @@ function Register() {
         <div className="field-wrapper">
           <input
             type="text"
-            className={`input-field ${touchedFields.username && fieldErrors.username ? 'input-error' : ''}`}
+            className={`input-field ${formSubmitted && fieldErrors.username ? 'input-error' : ''}`}
             placeholder="Username"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            onBlur={() => handleBlur('username')}
+            onChange={handleUsernameChange}
             disabled={isLoading}
           />
-          {touchedFields.username && fieldErrors.username && 
+          {formSubmitted && fieldErrors.username && 
             <div className="error-message">{fieldErrors.username}</div>
           }
           <div className="requirements-text">
@@ -166,14 +180,13 @@ function Register() {
         <div className="field-wrapper">
           <input
             type="email"
-            className={`input-field ${touchedFields.email && fieldErrors.email ? 'input-error' : ''}`}
+            className={`input-field ${formSubmitted && fieldErrors.email ? 'input-error' : ''}`}
             placeholder="Email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => handleBlur('email')}
+            onChange={handleEmailChange}
             disabled={isLoading}
           />
-          {touchedFields.email && fieldErrors.email && 
+          {formSubmitted && fieldErrors.email && 
             <div className="error-message">{fieldErrors.email}</div>
           }
         </div>
@@ -181,14 +194,13 @@ function Register() {
         <div className="field-wrapper">
           <input
             type="password"
-            className={`input-field ${touchedFields.password && fieldErrors.password ? 'input-error' : ''}`}
+            className={`input-field ${formSubmitted && fieldErrors.password ? 'input-error' : ''}`}
             placeholder="Password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onBlur={() => handleBlur('password')}
+            onChange={handlePasswordChange}
             disabled={isLoading}
           />
-          {touchedFields.password && fieldErrors.password && 
+          {formSubmitted && fieldErrors.password && 
             <div className="error-message">{fieldErrors.password}</div>
           }
           <div className="requirements-text">
@@ -200,14 +212,13 @@ function Register() {
         <div className="field-wrapper">
           <input
             type="password"
-            className={`input-field ${touchedFields.confirmPassword && fieldErrors.confirmPassword ? 'input-error' : ''}`}
+            className={`input-field ${formSubmitted && fieldErrors.confirmPassword ? 'input-error' : ''}`}
             placeholder="Confirm Password"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            onBlur={() => handleBlur('confirmPassword')}
+            onChange={handleConfirmPasswordChange}
             disabled={isLoading}
           />
-          {touchedFields.confirmPassword && fieldErrors.confirmPassword && 
+          {formSubmitted && fieldErrors.confirmPassword && 
             <div className="error-message">{fieldErrors.confirmPassword}</div>
           }
         </div>
