@@ -8,6 +8,7 @@ from datetime import datetime
 import os
 import time
 from dotenv import load_dotenv
+from password_utils import hash_password, verify_password  # Import the password utilities
 
 # Load environment variables
 load_dotenv()
@@ -70,7 +71,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True)
     email = Column(String(100), unique=True, index=True)
-    password = Column(String(255))  # Will store plain password for now
+    password = Column(String(255))  # Will now store hashed password
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -117,8 +118,8 @@ def login(data: LoginData, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == data.username).first()
     
     # Check if user exists and password is correct
-    if not user or user.password != data.password:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user or not verify_password(data.password, user.password):
+        raise HTTPException(status_code=401, detail="Invalid Username or password")
     
     return {"message": "Login successful"}
 
@@ -132,8 +133,9 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(status_code=400, detail="Username or email already registered")
     
-    # Create new user with plain password
-    new_user = User(username=data.username, email=data.email, password=data.password)
+    # Create new user with hashed password
+    hashed_password = hash_password(data.password)
+    new_user = User(username=data.username, email=data.email, password=hashed_password)
     
     db.add(new_user)
     db.commit()
@@ -145,11 +147,11 @@ def change_password(data: ChangePasswordData, db: Session = Depends(get_db)):
     # For simplicity, we're using a hardcoded user - in a real app, get the user from session/token
     user = db.query(User).filter(User.username == "admin").first()
     
-    if not user or user.password != data.oldPassword:
+    if not user or not verify_password(data.oldPassword, user.password):
         raise HTTPException(status_code=401, detail="Invalid current password")
     
-    # Update password
-    user.password = data.newPassword
+    # Update password with new hash
+    user.password = hash_password(data.newPassword)
     db.commit()
     
     return {"message": "Password changed successfully"}
@@ -192,13 +194,16 @@ def create_initial_users():
     try:
         admin_exists = db.query(User).filter(User.username == "admin").first()
         if not admin_exists:
+            # Create admin with hashed password
+            hashed_password = hash_password("admin")
             admin_user = User(
                 username="admin",
                 email="admin@example.com",
-                password="admin"  # Plain text password for development
+                password=hashed_password
             )
             db.add(admin_user)
             db.commit()
+            print("Created admin user with secure password")
     finally:
         db.close()
 
