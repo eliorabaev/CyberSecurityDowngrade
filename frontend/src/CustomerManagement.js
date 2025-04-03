@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import config from './config';
+import { validateCustomerName } from './utils/validation';
 
 function CustomerManagement({ successMessage }) {
   // State for form inputs
@@ -7,6 +8,14 @@ function CustomerManagement({ successMessage }) {
   const [internetPackage, setInternetPackage] = useState("");
   const [sector, setSector] = useState("");
   const [message, setMessage] = useState({ text: successMessage || "", type: successMessage ? "success" : "" });
+  
+  // Form validation states
+  const [fieldErrors, setFieldErrors] = useState({
+    customerName: '',
+    internetPackage: '',
+    sector: ''
+  });
+  const [formSubmitted, setFormSubmitted] = useState(false);
   
   // State for storing customers
   const [customers, setCustomers] = useState([]);
@@ -40,11 +49,60 @@ function CustomerManagement({ successMessage }) {
     }
   };
 
+  // Handle customer name changes (clear error when validation passes)
+  const handleCustomerNameChange = (e) => {
+    const value = e.target.value;
+    setCustomerName(value);
+    
+    // If form was submitted and there was an error that's now fixed
+    if (formSubmitted && fieldErrors.customerName) {
+      const validation = validateCustomerName(value);
+      if (validation.isValid) {
+        setFieldErrors({...fieldErrors, customerName: ''});
+      }
+    }
+  };
+
+  // Handle internet package changes (clear error when field is filled)
+  const handleInternetPackageChange = (e) => {
+    const value = e.target.value;
+    setInternetPackage(value);
+    
+    // If form was submitted and there was an error that's now fixed
+    if (formSubmitted && fieldErrors.internetPackage && value) {
+      setFieldErrors({...fieldErrors, internetPackage: ''});
+    }
+  };
+
+  // Handle sector changes (clear error when field is filled)
+  const handleSectorChange = (e) => {
+    const value = e.target.value;
+    setSector(value);
+    
+    // If form was submitted and there was an error that's now fixed
+    if (formSubmitted && fieldErrors.sector && value) {
+      setFieldErrors({...fieldErrors, sector: ''});
+    }
+  };
+
   // Handle form submission
   const handleAddCustomer = async () => {
-    // Simple validation
-    if (!customerName || !internetPackage || !sector) {
-      setMessage({ text: "Please fill in all fields", type: "error" });
+    // Mark form as submitted to show validation errors
+    setFormSubmitted(true);
+    
+    // Validate all fields
+    const nameValidation = validateCustomerName(customerName);
+    const errors = {
+      customerName: nameValidation.errorMessage,
+      internetPackage: internetPackage ? '' : 'Please select an internet package',
+      sector: sector ? '' : 'Please select a sector'
+    };
+    
+    setFieldErrors(errors);
+
+    // Check if there are any validation errors
+    if (Object.values(errors).some(error => error !== '')) {
+      setMessage({ text: "Please fix the form errors before submitting", type: "error" });
       return;
     }
 
@@ -69,6 +127,12 @@ function CustomerManagement({ successMessage }) {
         setCustomerName("");
         setInternetPackage("");
         setSector("");
+        setFieldErrors({
+          customerName: '',
+          internetPackage: '',
+          sector: ''
+        });
+        setFormSubmitted(false);
         setMessage({ text: data.message || "Customer added successfully!", type: "success" });
         
         // Refresh the customer list
@@ -128,39 +192,57 @@ function CustomerManagement({ successMessage }) {
           
           <div className="form-row">
             <div className="form-group">
-              <input
-                type="text"
-                className="input-field"
-                placeholder="Customer Name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-              />
+              <div className="field-wrapper">
+                <input
+                  type="text"
+                  className={`input-field ${formSubmitted && fieldErrors.customerName ? 'input-error' : ''}`}
+                  placeholder="Customer Name"
+                  value={customerName}
+                  onChange={handleCustomerNameChange}
+                />
+                {formSubmitted && fieldErrors.customerName && 
+                  <div className="error-message">{fieldErrors.customerName}</div>
+                }
+                <div className="requirements-text">
+                  Customer name can only contain English letters and spaces.
+                </div>
+              </div>
             </div>
             
             <div className="form-group">
-              <select
-                className="input-field"
-                value={internetPackage}
-                onChange={(e) => setInternetPackage(e.target.value)}
-              >
-                <option value="">Select Internet Package</option>
-                {availablePackages.map((pkg, index) => (
-                  <option key={index} value={pkg}>{pkg}</option>
-                ))}
-              </select>
+              <div className="field-wrapper">
+                <select
+                  className={`input-field ${formSubmitted && fieldErrors.internetPackage ? 'input-error' : ''}`}
+                  value={internetPackage}
+                  onChange={handleInternetPackageChange}
+                >
+                  <option value="">Select Internet Package</option>
+                  {availablePackages.map((pkg, index) => (
+                    <option key={index} value={pkg}>{pkg}</option>
+                  ))}
+                </select>
+                {formSubmitted && fieldErrors.internetPackage && 
+                  <div className="error-message">{fieldErrors.internetPackage}</div>
+                }
+              </div>
             </div>
             
             <div className="form-group">
-              <select
-                className="input-field"
-                value={sector}
-                onChange={(e) => setSector(e.target.value)}
-              >
-                <option value="">Select Sector</option>
-                {availableSectors.map((sec, index) => (
-                  <option key={index} value={sec}>{sec}</option>
-                ))}
-              </select>
+              <div className="field-wrapper">
+                <select
+                  className={`input-field ${formSubmitted && fieldErrors.sector ? 'input-error' : ''}`}
+                  value={sector}
+                  onChange={handleSectorChange}
+                >
+                  <option value="">Select Sector</option>
+                  {availableSectors.map((sec, index) => (
+                    <option key={index} value={sec}>{sec}</option>
+                  ))}
+                </select>
+                {formSubmitted && fieldErrors.sector && 
+                  <div className="error-message">{fieldErrors.sector}</div>
+                }
+              </div>
             </div>
           </div>
           

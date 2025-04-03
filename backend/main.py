@@ -9,6 +9,14 @@ import os
 import time
 from dotenv import load_dotenv
 from password_utils import hash_password, verify_password  # Import the password utilities
+from validation_utils import (
+    validate_username, 
+    validate_password, 
+    validate_email, 
+    validate_customer_name,
+    validate_internet_package,
+    validate_sector
+)
 
 # Load environment variables
 load_dotenv()
@@ -115,16 +123,33 @@ class CustomerData(BaseModel):
 # User endpoints
 @app.post("/login")
 def login(data: LoginData, db: Session = Depends(get_db)):
+    if not data.username or not data.password:
+        raise HTTPException(status_code=400, detail="Username and password are required")
+
     user = db.query(User).filter(User.username == data.username).first()
-    
-    # Check if user exists and password is correct
+
     if not user or not verify_password(data.password, user.password):
-        raise HTTPException(status_code=401, detail="Invalid Username or password")
+        raise HTTPException(status_code=401, detail="Invalid username or password")
     
     return {"message": "Login successful"}
 
 @app.post("/register")
 def register(data: RegisterData, db: Session = Depends(get_db)):
+    # Validate username
+    is_valid, error_message = validate_username(data.username)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
+    # Validate email
+    is_valid, error_message = validate_email(data.email)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
+    # Validate password
+    is_valid, error_message = validate_password(data.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
     # Check if username or email already exists
     existing_user = db.query(User).filter(
         (User.username == data.username) | (User.email == data.email)
@@ -144,6 +169,15 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
 
 @app.post("/change-password")
 def change_password(data: ChangePasswordData, db: Session = Depends(get_db)):
+    # Validate old password exists
+    if not data.oldPassword:
+        raise HTTPException(status_code=400, detail="Current password is required")
+    
+    # Validate new password
+    is_valid, error_message = validate_password(data.newPassword)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
     # For simplicity, we're using a hardcoded user - in a real app, get the user from session/token
     user = db.query(User).filter(User.username == "admin").first()
     
@@ -159,6 +193,22 @@ def change_password(data: ChangePasswordData, db: Session = Depends(get_db)):
 # Customer endpoints
 @app.post("/customers")
 def add_customer(data: CustomerData, db: Session = Depends(get_db)):
+    # Validate customer name
+    is_valid, error_message = validate_customer_name(data.name)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
+    # Validate internet package
+    is_valid, error_message = validate_internet_package(data.internet_package)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
+    # Validate sector
+    is_valid, error_message = validate_sector(data.sector)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
+    # Create new customer
     new_customer = Customer(
         name=data.name,
         internet_package=data.internet_package,

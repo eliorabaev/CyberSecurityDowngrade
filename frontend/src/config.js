@@ -16,6 +16,50 @@ const config = {
   // Authentication settings
   authTokenKey: 'auth_token', // localStorage key for auth token
   
+  // Validation rules
+  validation: {
+    username: {
+      pattern: /^[a-zA-Z0-9]+$/, // Only English letters and numbers
+      minLength: 3,
+      maxLength: 20,
+      errorMessages: {
+        pattern: "Username can only contain English letters and numbers without spaces",
+        minLength: "Username must be at least 3 characters",
+        maxLength: "Username cannot exceed 20 characters",
+        required: "Username is required"
+      }
+    },
+    password: {
+      minLength: 8,
+      maxLength: 50,
+      requireUppercase: true,
+      requireLowercase: true,
+      requireNumbers: true,
+      requireSpecial: true,
+      specialChars: "!@#$%^&*()_-+=<>?/[]{}|",
+      errorMessages: {
+        minLength: "Password must be at least 8 characters",
+        maxLength: "Password cannot exceed 50 characters",
+        requireUppercase: "Password must include at least one uppercase letter",
+        requireLowercase: "Password must include at least one lowercase letter",
+        requireNumbers: "Password must include at least one number",
+        requireSpecial: "Password must include at least one special character",
+        required: "Password is required"
+      }
+    },
+    customerName: {
+      pattern: /^[a-zA-Z\s]+$/, // Only English letters and spaces
+      minLength: 2,
+      maxLength: 50,
+      errorMessages: {
+        pattern: "Customer name can only contain English letters and spaces",
+        minLength: "Customer name must be at least 2 characters",
+        maxLength: "Customer name cannot exceed 50 characters",
+        required: "Customer name is required"
+      }
+    }
+  },
+  
   // Available packages and sectors for dropdown menus
   availablePackages: [
     "Basic (10 Mbps)", 
