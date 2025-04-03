@@ -14,7 +14,10 @@ A web application for managing internet service customers with a FastAPI backend
 │   ├── .env.example         # Example backend environment variables
 │   ├── docker-compose.yml   # Docker Compose configuration
 │   ├── Dockerfile           # Backend Docker configuration
+│   ├── init.sql             # Database initialization script
 │   ├── main.py              # FastAPI application
+│   ├── password_utils.py    # Password hashing and verification utilities
+│   ├── validation_utils.py  # Input validation utilities
 │   └── requirements.txt     # Python dependencies
 │
 └── frontend/
@@ -32,6 +35,8 @@ A web application for managing internet service customers with a FastAPI backend
         ├── config.js        # Configuration settings
         ├── index.js         # React entry point
         ├── index.css        # Global styles
+        ├── utils/           # Utility functions
+        │   └── validation.js # Client-side validation functions
         ├── ChangePassword.js
         ├── CustomerManagement.js
         ├── ForgotPassword.js
@@ -81,6 +86,11 @@ FRONTEND_URL=http://localhost:3000
 
 # Always use MySQL
 USE_MYSQL=true
+
+# Salt for password hashing
+# This should be a long, random string
+# You can generate one using: openssl rand -base64 32
+PASSWORD_SALT=your_random_salt_string
 ```
 
 Also set up the frontend environment variables:
@@ -154,11 +164,17 @@ The frontend is built with React. Key components:
 - `config.js`: Configuration settings including API URL
 - Component files: `CustomerManagement.js`, `Register.js`, etc.
 
-## Security Considerations
+## Security Features
 
-- **Important**: This application stores passwords in plain text for demonstration purposes. In a production environment, implement password hashing.
-- The default admin credentials should be changed immediately after setup.
-- Consider implementing proper authentication with JWT tokens for a production deployment.
+- **Password Hashing**: Passwords are securely hashed using PBKDF2-HMAC-SHA256 with a high iteration count
+- **Input Validation**: All inputs are validated on both client and server sides
+- **Secure Authentication**: Login system provides minimal error information to prevent username enumeration
+
+## Validation Rules
+
+- **Username**: 3-20 characters, only English letters and numbers (no spaces or special characters)
+- **Password**: At least 8 characters, must include uppercase, lowercase, numbers, and special characters
+- **Customer Name**: Only English letters and spaces allowed
 
 ## Troubleshooting
 
@@ -184,3 +200,11 @@ If the frontend can't connect to the API:
 
 1. Verify the API URL in the frontend's `.env` file
 2. Check CORS settings in `main.py` if you're using different hosts or ports
+
+### Password Salt Issues
+
+If you encounter authentication problems after setting up:
+
+1. Make sure you've set a valid `PASSWORD_SALT` value in your `.env` file
+2. The salt must be a valid base64-encoded string
+3. If you change the salt after users are created, existing users won't be able to log in
