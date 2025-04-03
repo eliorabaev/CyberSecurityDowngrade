@@ -12,10 +12,28 @@ function Login() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({
+    username: '',
+    password: ''
+  });
 
   const handleLogin = async () => {
     try {
+      // Reset errors
+      setFieldErrors({
+        username: '',
+        password: ''
+      });
+      
       // Form validation
+      const errors = {
+        username: username ? '' : "Username is required",
+        password: password ? '' : "Password is required"
+      };
+      
+      setFieldErrors(errors);
+      
+      // Check if there are any validation errors
       if (!username || !password) {
         setMessage("Please enter both username and password");
         return;
@@ -55,20 +73,27 @@ function Login() {
         <h1>Welcome Admin</h1>
         <p>Sign in to continue</p>
 
-        <input
-          type="text"
-          className="input-field"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <input
-          type="password"
-          className="input-field"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div className="field-wrapper">
+          <input
+            type="text"
+            className={`input-field ${fieldErrors.username ? 'input-error' : ''}`}
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          {fieldErrors.username && <div className="error-message">{fieldErrors.username}</div>}
+        </div>
+        
+        <div className="field-wrapper">
+          <input
+            type="password"
+            className={`input-field ${fieldErrors.password ? 'input-error' : ''}`}
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {fieldErrors.password && <div className="error-message">{fieldErrors.password}</div>}
+        </div>
 
         <button className="connect-button" onClick={handleLogin}>
           Connect

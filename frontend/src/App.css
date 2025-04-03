@@ -1,8 +1,10 @@
-/* Box sizing for consistent layout */
+/* Reset and Base Styles */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 /* Custom color variables */
@@ -18,12 +20,13 @@
   --input-text: #ffffff;
   --error-color: #ff6b6b;
   --success-color: #4BB543;
+  --info-color: #8ecdf7;
   --table-header-bg: #333333;
   --table-row-even: #2a2a2a;
   --table-row-odd: #252525;
 }
 
-/* Full-height layout */
+/* Document and Body Setup */
 html, body {
   height: 100%;
   margin: 0;
@@ -34,67 +37,62 @@ html, body {
   align-items: center;
 }
 
-/* Centered login box */
+/* Login Box - Main Container */
 .login-box {
   background-color: var(--box-bg);
-  padding: 40px;
+  width: 400px; /* Fixed exact width */
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  width: 100%;
-  max-width: 400px;
-  text-align: center;
-  min-height: 470px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  overflow: hidden; /* Ensure consistent corners */
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border-color);
+  padding: 0; /* Remove padding from container */
+}
+
+/* Form Content Container */
+.form-content {
+  padding: 40px 40px 20px 40px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* Headings */
 .login-box h1 {
-  margin-bottom: 0.5rem;
+  width: 100%;
+  margin-bottom: 8px;
   color: var(--text-primary);
   font-weight: 600;
   font-size: 28px;
+  text-align: center;
 }
 
 /* Subheading text */
-p {
-  margin: 0 0 1.5rem 0;
+.login-box p {
+  width: 100%;
+  margin-bottom: 24px;
   color: var(--text-secondary);
   font-size: 16px;
+  text-align: center;
 }
 
-/* Create a container for the main form content */
-.form-content {
-  flex: 1;
-}
-
-/* Message area with fixed height */
-.login-message-container {
-  height: 60px;
-  margin-top: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-}
-
-.login-message {
-  margin: 0;
-  padding: 10px;
-  border-radius: 4px;
+/* Field Wrapper - Maintains consistent spacing and width */
+.field-wrapper {
   width: 100%;
-  background-color: rgba(255, 255, 255, 0.05);
+  margin-bottom: 16px;
 }
 
-/* Input fields */
+/* Input Fields */
 .input-field {
+  display: block;
   width: 100%;
-  padding: 14px;
-  margin: 0.5rem 0;
+  height: 50px;
+  padding: 0 16px;
+  background-color: var(--input-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  background-color: var(--input-bg);
   color: var(--input-text);
   font-size: 16px;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -103,7 +101,7 @@ p {
 .input-field:focus {
   outline: none;
   border-color: var(--accent-blue);
-  box-shadow: 0 0 0 2px rgba(0, 149, 255, 0.3);
+  box-shadow: 0 0 0 2px rgba(0, 149, 255, 0.2);
 }
 
 .input-field::placeholder {
@@ -111,32 +109,44 @@ p {
   opacity: 0.7;
 }
 
-/* Connect button */
+/* Error Message */
+.error-message {
+  display: block;
+  width: 100%;
+  color: var(--error-color);
+  font-size: 12px;
+  margin-top: 4px;
+  text-align: left;
+  line-height: 1.2;
+  padding-left: 4px;
+}
+
+/* Requirements Helper Text */
+.requirements-text {
+  display: block;
+  width: 100%;
+  color: var(--info-color);
+  font-size: 11px;
+  margin-top: 4px;
+  text-align: left;
+  line-height: 1.2;
+  opacity: 0.7;
+  padding-left: 4px;
+}
+
+/* Connect Button */
 .connect-button {
   width: 100%;
-  padding: 14px;
-  margin-top: 1.5rem;
+  height: 50px;
+  margin: 24px 0 16px 0;
   background-color: var(--accent-blue);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   border-radius: 8px;
-  cursor: pointer;
   font-size: 16px;
   font-weight: 600;
-  transition: background-color 0.2s;
-}
-
-/* Button container for the dashboard */
-.button-container {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1rem;
-}
-
-.button-container .connect-button {
-  width: auto;
-  min-width: 150px;
-  margin-top: 0;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
 }
 
 .connect-button:hover {
@@ -147,14 +157,15 @@ p {
   transform: translateY(1px);
 }
 
-/* Links container - keep on one line with space between */
+/* Links Container */
 .links {
-  margin-top: 1.5rem;
   display: flex;
   justify-content: space-between;
+  width: 100%;
+  margin-top: 8px;
 }
 
-/* Individual link styling */
+/* Link Styling */
 .link {
   color: var(--accent-blue);
   text-decoration: none;
@@ -167,16 +178,31 @@ p {
   text-decoration: underline;
 }
 
-/* Responsive adjustments */
-@media (max-width: 480px) {
-  .login-box {
-    padding: 30px 20px;
-  }
+/* Message Container */
+.login-message-container {
+  width: 100%;
+  min-height: 60px;
+  padding: 0 40px 20px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* New styles for CustomerManagement component */
+.login-message {
+  width: 100%;
+  padding: 12px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  text-align: center;
+}
 
-/* Dashboard container */
+/* Field Error Styling */
+.input-field.input-error {
+  border-color: var(--error-color);
+}
+
+/* Dashboard Styles */
 .dashboard-container {
   background-color: var(--box-bg);
   border-radius: 12px;
@@ -189,7 +215,7 @@ p {
   flex-direction: column;
 }
 
-/* Dashboard header with title and logout button */
+/* Dashboard Header */
 .dashboard-header {
   display: flex;
   justify-content: space-between;
@@ -204,22 +230,7 @@ p {
   font-size: 24px;
 }
 
-.logout-button {
-  background-color: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.logout-button:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-}
-
-/* Dashboard content area */
+/* Dashboard Content Area */
 .dashboard-content {
   display: flex;
   flex-direction: column;
@@ -227,7 +238,7 @@ p {
   flex: 1;
 }
 
-/* Add form styles */
+/* Customer Form Container */
 .customer-form-container {
   background-color: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
@@ -242,7 +253,7 @@ p {
   margin-bottom: 20px;
 }
 
-/* Form row for horizontal layout */
+/* Form Row Layout */
 .form-row {
   display: flex;
   gap: 15px;
@@ -254,7 +265,7 @@ p {
   margin-bottom: 0;
 }
 
-/* Dashboard message area */
+/* Dashboard Message Area */
 .dashboard-message {
   padding: 0 30px;
   height: 50px;
@@ -262,6 +273,7 @@ p {
   align-items: center;
 }
 
+/* Message Styling */
 .message {
   width: 100%;
   padding: 10px;
@@ -279,7 +291,7 @@ p {
   background-color: rgba(255, 107, 107, 0.1);
 }
 
-/* Table styles */
+/* Customer Table Container */
 .customer-table-container {
   background-color: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
@@ -294,6 +306,7 @@ p {
   margin-bottom: 20px;
 }
 
+/* Table Styling */
 .customer-table {
   width: 100%;
   table-layout: fixed;
@@ -330,6 +343,7 @@ p {
   text-overflow: ellipsis;
 }
 
+/* Table Row Styling */
 .customer-table tr:nth-child(even) {
   background-color: var(--table-row-even);
 }
@@ -338,46 +352,21 @@ p {
   background-color: var(--table-row-odd);
 }
 
-.no-data {
+/* No Data and Loading States */
+.no-data, .loading {
   color: var(--text-secondary);
   text-align: center;
   padding: 30px 0;
 }
 
-/* Responsive adjustments for dashboard */
-@media (max-width: 1050px) {
-  .dashboard-container {
-    width: 95%;
-    margin: 20px auto;
-  }
-  
-  .dashboard-content {
-    padding: 20px;
-  }
-  
-  .customer-table th,
-  .customer-table td {
-    padding: 10px;
-  }
-  
-  .form-row {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .form-group {
-    margin-bottom: 0;
-  }
-}
-
-/* Style for the header buttons container */
+/* Header Buttons Container */
 .header-buttons {
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
-/* Style for the change password button */
+/* Change Password Button */
 .change-password-button {
   background-color: var(--accent-blue);
   color: white;
@@ -392,7 +381,7 @@ p {
   background-color: var(--accent-hover);
 }
 
-/* Update existing logout button to maintain consistent styling */
+/* Logout Button */
 .logout-button {
   background-color: transparent;
   color: var(--text-secondary);
@@ -403,7 +392,28 @@ p {
   transition: all 0.2s;
 }
 
-/* Responsive adjustments for the header */
+.logout-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* Media Queries for Responsiveness */
+@media (max-width: 1050px) {
+  .dashboard-container {
+    width: 95%;
+    margin: 20px auto;
+  }
+  
+  .dashboard-content {
+    padding: 20px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
 @media (max-width: 640px) {
   .dashboard-header {
     flex-direction: column;
@@ -417,8 +427,19 @@ p {
   }
 }
 
-/* For even smaller screens */
 @media (max-width: 480px) {
+  .login-box {
+    width: 90%;
+  }
+  
+  .form-content {
+    padding: 30px 20px 15px 20px;
+  }
+  
+  .login-message-container {
+    padding: 0 20px 20px 20px;
+  }
+  
   .dashboard-header {
     flex-direction: column;
     text-align: center;
@@ -430,4 +451,3 @@ p {
     overflow-x: auto;
   }
 }
-

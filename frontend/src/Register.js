@@ -14,41 +14,13 @@ function Register() {
     password: '',
     confirmPassword: ''
   });
+  const [touchedFields, setTouchedFields] = useState({
+    username: false,
+    email: false,
+    password: false,
+    confirmPassword: false
+  });
   const [isLoading, setIsLoading] = useState(false);
-
-  // Handle input validation on change
-  const handleUsernameChange = (e) => {
-    const value = e.target.value;
-    setUsername(value);
-    if (value) {
-      const validation = validateUsername(value);
-      setFieldErrors({...fieldErrors, username: validation.errorMessage});
-    } else {
-      setFieldErrors({...fieldErrors, username: ''});
-    }
-  };
-
-  const handlePasswordChange = (e) => {
-    const value = e.target.value;
-    setPassword(value);
-    if (value) {
-      const validation = validatePassword(value);
-      setFieldErrors({...fieldErrors, password: validation.errorMessage});
-    } else {
-      setFieldErrors({...fieldErrors, password: ''});
-    }
-  };
-
-  const handleConfirmPasswordChange = (e) => {
-    const value = e.target.value;
-    setConfirmPassword(value);
-    if (value) {
-      const validation = validatePasswordMatch(password, value);
-      setFieldErrors({...fieldErrors, confirmPassword: validation.errorMessage});
-    } else {
-      setFieldErrors({...fieldErrors, confirmPassword: ''});
-    }
-  };
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,18 +33,43 @@ function Register() {
     return { isValid: true, errorMessage: '' };
   };
 
-  const handleEmailChange = (e) => {
-    const value = e.target.value;
-    setEmail(value);
-    if (value) {
-      const validation = validateEmail(value);
+  // Mark field as touched when user leaves it
+  const handleBlur = (field) => {
+    setTouchedFields({
+      ...touchedFields,
+      [field]: true
+    });
+
+    // Validate on blur
+    if (field === 'username' && username) {
+      const validation = validateUsername(username);
+      setFieldErrors({...fieldErrors, username: validation.errorMessage});
+    }
+    else if (field === 'email' && email) {
+      const validation = validateEmail(email);
       setFieldErrors({...fieldErrors, email: validation.errorMessage});
-    } else {
-      setFieldErrors({...fieldErrors, email: ''});
+    }
+    else if (field === 'password' && password) {
+      const validation = validatePassword(password);
+      setFieldErrors({...fieldErrors, password: validation.errorMessage});
+    }
+    else if (field === 'confirmPassword' && confirmPassword) {
+      if (password) {
+        const validation = validatePasswordMatch(password, confirmPassword);
+        setFieldErrors({...fieldErrors, confirmPassword: validation.errorMessage});
+      }
     }
   };
 
   const handleRegister = async () => {
+    // Mark all fields as touched
+    setTouchedFields({
+      username: true,
+      email: true,
+      password: true,
+      confirmPassword: true
+    });
+
     // Validate all fields before submission
     const usernameValidation = validateUsername(username);
     const emailValidation = validateEmail(email);
@@ -119,6 +116,12 @@ function Register() {
           password: '',
           confirmPassword: ''
         });
+        setTouchedFields({
+          username: false,
+          email: false,
+          password: false,
+          confirmPassword: false
+        });
         
         // Redirect to login page after 2 seconds
         setTimeout(() => {
@@ -142,52 +145,71 @@ function Register() {
         <h1>Create Account</h1>
         <p>Please fill in your details</p>
 
-        <div className="input-container">
+        <div className="field-wrapper">
           <input
             type="text"
-            className={`input-field ${fieldErrors.username ? 'input-error' : ''}`}
+            className={`input-field ${touchedFields.username && fieldErrors.username ? 'input-error' : ''}`}
             placeholder="Username"
             value={username}
-            onChange={handleUsernameChange}
+            onChange={(e) => setUsername(e.target.value)}
+            onBlur={() => handleBlur('username')}
             disabled={isLoading}
           />
-          {fieldErrors.username && <div className="error-message">{fieldErrors.username}</div>}
+          {touchedFields.username && fieldErrors.username && 
+            <div className="error-message">{fieldErrors.username}</div>
+          }
+          <div className="requirements-text">
+            Username must be 3-20 characters using only English letters and numbers.
+          </div>
         </div>
 
-        <div className="input-container">
+        <div className="field-wrapper">
           <input
             type="email"
-            className={`input-field ${fieldErrors.email ? 'input-error' : ''}`}
+            className={`input-field ${touchedFields.email && fieldErrors.email ? 'input-error' : ''}`}
             placeholder="Email"
             value={email}
-            onChange={handleEmailChange}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => handleBlur('email')}
             disabled={isLoading}
           />
-          {fieldErrors.email && <div className="error-message">{fieldErrors.email}</div>}
+          {touchedFields.email && fieldErrors.email && 
+            <div className="error-message">{fieldErrors.email}</div>
+          }
         </div>
 
-        <div className="input-container">
+        <div className="field-wrapper">
           <input
             type="password"
-            className={`input-field ${fieldErrors.password ? 'input-error' : ''}`}
+            className={`input-field ${touchedFields.password && fieldErrors.password ? 'input-error' : ''}`}
             placeholder="Password"
             value={password}
-            onChange={handlePasswordChange}
+            onChange={(e) => setPassword(e.target.value)}
+            onBlur={() => handleBlur('password')}
             disabled={isLoading}
           />
-          {fieldErrors.password && <div className="error-message">{fieldErrors.password}</div>}
+          {touchedFields.password && fieldErrors.password && 
+            <div className="error-message">{fieldErrors.password}</div>
+          }
+          <div className="requirements-text">
+            Password must be at least 8 characters and include uppercase, lowercase, 
+            numbers, and special characters.
+          </div>
         </div>
 
-        <div className="input-container">
+        <div className="field-wrapper">
           <input
             type="password"
-            className={`input-field ${fieldErrors.confirmPassword ? 'input-error' : ''}`}
+            className={`input-field ${touchedFields.confirmPassword && fieldErrors.confirmPassword ? 'input-error' : ''}`}
             placeholder="Confirm Password"
             value={confirmPassword}
-            onChange={handleConfirmPasswordChange}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onBlur={() => handleBlur('confirmPassword')}
             disabled={isLoading}
           />
-          {fieldErrors.confirmPassword && <div className="error-message">{fieldErrors.confirmPassword}</div>}
+          {touchedFields.confirmPassword && fieldErrors.confirmPassword && 
+            <div className="error-message">{fieldErrors.confirmPassword}</div>
+          }
         </div>
 
         <button 
