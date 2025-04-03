@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import config from './config';
+import { validateUsername, validatePassword, validatePasswordMatch } from './utils/validation';
 
 function Register() {
   const [username, setUsername] = useState("");
@@ -7,17 +8,89 @@ function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleRegister = async () => {
-    // Simple validation
-    if (!username || !email || !password) {
-      setMessage("Please fill all required fields");
-      return;
+  // Handle input validation on change
+  const handleUsernameChange = (e) => {
+    const value = e.target.value;
+    setUsername(value);
+    if (value) {
+      const validation = validateUsername(value);
+      setFieldErrors({...fieldErrors, username: validation.errorMessage});
+    } else {
+      setFieldErrors({...fieldErrors, username: ''});
     }
-    
-    if (password !== confirmPassword) {
-      setMessage("Passwords do not match");
+  };
+
+  const handlePasswordChange = (e) => {
+    const value = e.target.value;
+    setPassword(value);
+    if (value) {
+      const validation = validatePassword(value);
+      setFieldErrors({...fieldErrors, password: validation.errorMessage});
+    } else {
+      setFieldErrors({...fieldErrors, password: ''});
+    }
+  };
+
+  const handleConfirmPasswordChange = (e) => {
+    const value = e.target.value;
+    setConfirmPassword(value);
+    if (value) {
+      const validation = validatePasswordMatch(password, value);
+      setFieldErrors({...fieldErrors, confirmPassword: validation.errorMessage});
+    } else {
+      setFieldErrors({...fieldErrors, confirmPassword: ''});
+    }
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) {
+      return { isValid: false, errorMessage: "Email is required" };
+    }
+    if (!emailRegex.test(email)) {
+      return { isValid: false, errorMessage: "Please enter a valid email address" };
+    }
+    return { isValid: true, errorMessage: '' };
+  };
+
+  const handleEmailChange = (e) => {
+    const value = e.target.value;
+    setEmail(value);
+    if (value) {
+      const validation = validateEmail(value);
+      setFieldErrors({...fieldErrors, email: validation.errorMessage});
+    } else {
+      setFieldErrors({...fieldErrors, email: ''});
+    }
+  };
+
+  const handleRegister = async () => {
+    // Validate all fields before submission
+    const usernameValidation = validateUsername(username);
+    const emailValidation = validateEmail(email);
+    const passwordValidation = validatePassword(password);
+    const confirmValidation = validatePasswordMatch(password, confirmPassword);
+
+    const errors = {
+      username: usernameValidation.errorMessage,
+      email: emailValidation.errorMessage,
+      password: passwordValidation.errorMessage,
+      confirmPassword: confirmValidation.errorMessage
+    };
+
+    setFieldErrors(errors);
+
+    // Check if there are any validation errors
+    if (Object.values(errors).some(error => error !== '')) {
+      setMessage("Please fix the form errors before submitting");
       return;
     }
 
@@ -40,6 +113,12 @@ function Register() {
         setEmail("");
         setPassword("");
         setConfirmPassword("");
+        setFieldErrors({
+          username: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        });
         
         // Redirect to login page after 2 seconds
         setTimeout(() => {
@@ -63,38 +142,53 @@ function Register() {
         <h1>Create Account</h1>
         <p>Please fill in your details</p>
 
-        <input
-          type="text"
-          className="input-field"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          disabled={isLoading}
-        />
-        <input
-          type="email"
-          className="input-field"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={isLoading}
-        />
-        <input
-          type="password"
-          className="input-field"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={isLoading}
-        />
-        <input
-          type="password"
-          className="input-field"
-          placeholder="Confirm Password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={isLoading}
-        />
+        <div className="input-container">
+          <input
+            type="text"
+            className={`input-field ${fieldErrors.username ? 'input-error' : ''}`}
+            placeholder="Username"
+            value={username}
+            onChange={handleUsernameChange}
+            disabled={isLoading}
+          />
+          {fieldErrors.username && <div className="error-message">{fieldErrors.username}</div>}
+        </div>
+
+        <div className="input-container">
+          <input
+            type="email"
+            className={`input-field ${fieldErrors.email ? 'input-error' : ''}`}
+            placeholder="Email"
+            value={email}
+            onChange={handleEmailChange}
+            disabled={isLoading}
+          />
+          {fieldErrors.email && <div className="error-message">{fieldErrors.email}</div>}
+        </div>
+
+        <div className="input-container">
+          <input
+            type="password"
+            className={`input-field ${fieldErrors.password ? 'input-error' : ''}`}
+            placeholder="Password"
+            value={password}
+            onChange={handlePasswordChange}
+            disabled={isLoading}
+          />
+          {fieldErrors.password && <div className="error-message">{fieldErrors.password}</div>}
+        </div>
+
+        <div className="input-container">
+          <input
+            type="password"
+            className={`input-field ${fieldErrors.confirmPassword ? 'input-error' : ''}`}
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={handleConfirmPasswordChange}
+            disabled={isLoading}
+          />
+          {fieldErrors.confirmPassword && <div className="error-message">{fieldErrors.confirmPassword}</div>}
+        </div>
 
         <button 
           className="connect-button" 
