@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import config from './config';
+import { useAuth } from './AuthContext';
 
 // Import the components
 import Register from './Register';
@@ -11,11 +12,13 @@ function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({
     username: '',
     password: ''
   });
+  
+  // Use the auth context
+  const auth = useAuth();
 
   const handleLogin = async () => {
     try {
@@ -50,8 +53,9 @@ function Login() {
 
       if (response.ok) {
         const data = await response.json();
-        setMessage(data.message);
-        setIsLoggedIn(true);
+        // Store the token and user information
+        auth.login({ username }, data.access_token);
+        setMessage("Login successful");
       } else {
         const errorData = await response.json();
         setMessage(errorData.detail || "Login failed");
@@ -63,7 +67,7 @@ function Login() {
   };
 
   // If logged in, redirect to CustomerManagement
-  if (isLoggedIn) {
+  if (auth.isAuthenticated) {
     return <CustomerManagement />;
   }
 
@@ -116,6 +120,9 @@ function App() {
   // State to track current path and any success messages
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [successMessage, setSuccessMessage] = useState(null);
+  
+  // Get auth context
+  const auth = useAuth();
 
   // Parse URL for any success messages
   useEffect(() => {
@@ -168,6 +175,11 @@ function App() {
     };
   }, []);
 
+  // Show loading state while authentication is initializing
+  if (auth.loading) {
+    return <div>Loading...</div>;
+  }
+
   // Return the appropriate component based on the current path
   switch (currentPath) {
     case '/register':
@@ -175,9 +187,9 @@ function App() {
     case '/forgot-password':
       return <ForgotPassword />;
     case '/change-password':
-      return <ChangePassword />;
+      return auth.isAuthenticated ? <ChangePassword /> : <Login />;
     case '/dashboard':
-      return <CustomerManagement successMessage={successMessage} />;
+      return auth.isAuthenticated ? <CustomerManagement successMessage={successMessage} /> : <Login />;
     default:
       return <Login />;
   }

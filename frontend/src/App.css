@@ -366,6 +366,16 @@ html, body {
   align-items: center;
 }
 
+/* User info styling */
+.user-info {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-right: 15px;
+  padding: 8px 12px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
 /* Change Password Button */
 .change-password-button {
   background-color: var(--accent-blue);
@@ -411,6 +421,19 @@ html, body {
   .form-row {
     flex-direction: column;
     gap: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-buttons {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .user-info {
+    margin-right: 0;
+    margin-bottom: 5px;
   }
 }
 
