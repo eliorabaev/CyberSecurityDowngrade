@@ -1,14 +1,15 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import time
 from dotenv import load_dotenv
-from password_utils import hash_password, verify_password  # Import the password utilities
+from typing import Optional
+from password_utils import hash_password, verify_password
 from validation_utils import (
     validate_username, 
     validate_password, 
@@ -17,6 +18,7 @@ from validation_utils import (
     validate_internet_package,
     validate_sector
 )
+from auth_utils import create_access_token, verify_token
 
 # Load environment variables
 load_dotenv()
@@ -101,7 +103,54 @@ def get_db():
     finally:
         db.close()
 
+# Get current user from token
+async def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not authorization:
+        raise HTTPException(
+            status_code=401, 
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    scheme, token = authorization.split()
+    if scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid authentication scheme",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    payload = verify_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    username = payload.get("sub")
+    if not username:
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(
+            status_code=401, 
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    return user
+
 # Pydantic models for request/response
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
 class LoginData(BaseModel):
     username: str
     password: str
@@ -121,7 +170,7 @@ class CustomerData(BaseModel):
     sector: str
 
 # User endpoints
-@app.post("/login")
+@app.post("/login", response_model=TokenResponse)
 def login(data: LoginData, db: Session = Depends(get_db)):
     if not data.username or not data.password:
         raise HTTPException(status_code=400, detail="Username and password are required")
@@ -131,7 +180,13 @@ def login(data: LoginData, db: Session = Depends(get_db)):
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     
-    return {"message": "Login successful"}
+    # Create access token with username as subject
+    access_token = create_access_token(
+        data={"sub": user.username},
+        expires_delta=timedelta(minutes=60)  # Token valid for 1 hour
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/register")
 def register(data: RegisterData, db: Session = Depends(get_db)):
@@ -168,7 +223,7 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
     return {"message": "Registration successful"}
 
 @app.post("/change-password")
-def change_password(data: ChangePasswordData, db: Session = Depends(get_db)):
+def change_password(data: ChangePasswordData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Validate old password exists
     if not data.oldPassword:
         raise HTTPException(status_code=400, detail="Current password is required")
@@ -178,21 +233,19 @@ def change_password(data: ChangePasswordData, db: Session = Depends(get_db)):
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_message)
     
-    # For simplicity, we're using a hardcoded user - in a real app, get the user from session/token
-    user = db.query(User).filter(User.username == "admin").first()
-    
-    if not user or not verify_password(data.oldPassword, user.password):
+    # Verify the old password matches the user's current password
+    if not verify_password(data.oldPassword, current_user.password):
         raise HTTPException(status_code=401, detail="Invalid current password")
     
     # Update password with new hash
-    user.password = hash_password(data.newPassword)
+    current_user.password = hash_password(data.newPassword)
     db.commit()
     
     return {"message": "Password changed successfully"}
 
-# Customer endpoints
+# Customer endpoints (protected by authentication)
 @app.post("/customers")
-def add_customer(data: CustomerData, db: Session = Depends(get_db)):
+def add_customer(data: CustomerData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Validate customer name
     is_valid, error_message = validate_customer_name(data.name)
     if not is_valid:
@@ -221,7 +274,7 @@ def add_customer(data: CustomerData, db: Session = Depends(get_db)):
     return {"message": "Customer added successfully"}
 
 @app.get("/customers")
-def get_customers(db: Session = Depends(get_db)):
+def get_customers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
     
     # Convert to list of dictionaries for JSON response
@@ -236,6 +289,14 @@ def get_customers(db: Session = Depends(get_db)):
         })
     
     return {"customers": customer_list}
+
+# Endpoint to get current user info
+@app.get("/me")
+def get_current_user_info(current_user: User = Depends(get_current_user)):
+    return {
+        "username": current_user.username,
+        "email": current_user.email
+    }
 
 # For development/testing: Add initial admin user if not exists
 @app.on_event("startup")

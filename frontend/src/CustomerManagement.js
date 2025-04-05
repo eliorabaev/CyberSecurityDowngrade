@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import config from './config';
 import { validateCustomerName } from './utils/validation';
+import { useAuth } from './AuthContext';
 
 function CustomerManagement({ successMessage }) {
   // State for form inputs
@@ -21,6 +22,9 @@ function CustomerManagement({ successMessage }) {
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Use auth context
+  const auth = useAuth();
+
   // Available internet packages and sectors for dropdowns from config
   const availablePackages = config.availablePackages;
   const availableSectors = config.availableSectors;
@@ -34,7 +38,18 @@ function CustomerManagement({ successMessage }) {
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${config.apiUrl}/customers`);
+      const response = await fetch(`${config.apiUrl}/customers`, {
+        headers: {
+          "Authorization": `Bearer ${auth.token}`  // Add token for authentication
+        }
+      });
+      
+      if (response.status === 401) {
+        // Token expired or invalid
+        handleAuthError();
+        return;
+      }
+      
       if (response.ok) {
         const data = await response.json();
         setCustomers(data.customers || []);
@@ -49,7 +64,13 @@ function CustomerManagement({ successMessage }) {
     }
   };
 
-  // Handle customer name changes (clear error when validation passes)
+  // Handle authentication errors
+  const handleAuthError = () => {
+    auth.logout();
+    window.location.href = "/?message=Your session has expired. Please log in again.";
+  };
+
+  // Handle customer name changes
   const handleCustomerNameChange = (e) => {
     const value = e.target.value;
     setCustomerName(value);
@@ -63,7 +84,7 @@ function CustomerManagement({ successMessage }) {
     }
   };
 
-  // Handle internet package changes (clear error when field is filled)
+  // Handle internet package changes
   const handleInternetPackageChange = (e) => {
     const value = e.target.value;
     setInternetPackage(value);
@@ -74,7 +95,7 @@ function CustomerManagement({ successMessage }) {
     }
   };
 
-  // Handle sector changes (clear error when field is filled)
+  // Handle sector changes
   const handleSectorChange = (e) => {
     const value = e.target.value;
     setSector(value);
@@ -111,7 +132,8 @@ function CustomerManagement({ successMessage }) {
       const response = await fetch(`${config.apiUrl}/customers`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${auth.token}` // Add token for authentication
         },
         body: JSON.stringify({
           name: customerName,
@@ -119,6 +141,12 @@ function CustomerManagement({ successMessage }) {
           sector: sector
         })
       });
+
+      if (response.status === 401) {
+        // Token expired or invalid
+        handleAuthError();
+        return;
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -149,7 +177,7 @@ function CustomerManagement({ successMessage }) {
 
   // Handle logout
   const handleLogout = () => {
-    // In a real app, you would clear authentication tokens here
+    auth.logout();
     window.location.href = "/";
   };
 
@@ -173,6 +201,7 @@ function CustomerManagement({ successMessage }) {
       <div className="dashboard-header">
         <h1>Customer Management</h1>
         <div className="header-buttons">
+          <span className="user-info">Logged in as: {auth.user?.username}</span>
           <button className="change-password-button" onClick={handleChangePassword}>
             Change Password
           </button>

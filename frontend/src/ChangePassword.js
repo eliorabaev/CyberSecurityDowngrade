@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import config from './config';
 import { validatePassword } from './utils/validation';
+import { useAuth } from './AuthContext';
 
 function ChangePassword() {
   const [oldPassword, setOldPassword] = useState("");
@@ -14,6 +15,9 @@ function ChangePassword() {
   });
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Get auth context
+  const auth = useAuth();
 
   // Handle changes to old password (clear error when field is filled)
   const handleOldPasswordChange = (e) => {
@@ -81,6 +85,7 @@ function ChangePassword() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${auth.token}` // Add token for authentication
         },
         body: JSON.stringify({ 
           oldPassword: oldPassword, 
@@ -112,7 +117,7 @@ function ChangePassword() {
     <div className="login-box">
       <div className="form-content">
         <h1>Change Password</h1>
-        <p>Enter your old password and a new password</p>
+        <p>Change password for {auth.user?.username}</p>
 
         <div className="field-wrapper">
           <input
