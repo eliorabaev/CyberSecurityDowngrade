@@ -1,6 +1,17 @@
 # Internet Service Provider Management System
 
-A web application for managing internet service customers with a FastAPI backend and React frontend.
+A secure web application for managing internet service customers with a FastAPI backend and React frontend, featuring robust user authentication and session management.
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+
+## Features
+
+- 🔐 **Secure Authentication**: JWT-based user sessions with token management
+- 👤 **User Management**: Register, login, and password management
+- 👥 **Customer Management**: Add and view internet service customers
+- 🔒 **Data Validation**: Comprehensive client and server-side validation
+- 🌐 **Responsive UI**: Modern, responsive React-based interface
 
 ## Project Structure
 
@@ -16,6 +27,7 @@ A web application for managing internet service customers with a FastAPI backend
 │   ├── Dockerfile           # Backend Docker configuration
 │   ├── init.sql             # Database initialization script
 │   ├── main.py              # FastAPI application
+│   ├── auth_utils.py        # JWT authentication utilities
 │   ├── password_utils.py    # Password hashing and verification utilities
 │   ├── validation_utils.py  # Input validation utilities
 │   └── requirements.txt     # Python dependencies
@@ -32,6 +44,7 @@ A web application for managing internet service customers with a FastAPI backend
     └── src/                 # React source code
         ├── App.js           # Main application component
         ├── App.css          # Main application styles
+        ├── AuthContext.js   # Authentication context provider
         ├── config.js        # Configuration settings
         ├── index.js         # React entry point
         ├── index.css        # Global styles
@@ -67,7 +80,7 @@ cd backend
 cp .env.example .env
 ```
 
-Then edit the `.env` file to set your database credentials:
+Then edit the `.env` file to set your database credentials and JWT secret:
 
 ```
 # Database Configuration
@@ -91,6 +104,10 @@ USE_MYSQL=true
 # This should be a long, random string
 # You can generate one using: openssl rand -base64 32
 PASSWORD_SALT=your_random_salt_string
+
+# JWT Authentication
+# Generate a secure secret key: openssl rand -hex 32
+JWT_SECRET_KEY=your_jwt_secret_key
 ```
 
 Also set up the frontend environment variables:
@@ -144,30 +161,50 @@ The system creates a default admin user on startup:
 
 **Important:** Change the default password after first login for security reasons.
 
-## Development
+## Authentication Flow
 
-### Backend API Endpoints
+The system uses JWT (JSON Web Tokens) for secure, stateless authentication:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/login` | POST | Authenticate a user |
-| `/register` | POST | Create a new user account |
-| `/change-password` | POST | Update user password |
-| `/customers` | GET | Retrieve all customers |
-| `/customers` | POST | Add a new customer |
+1. **Login**: User provides credentials → Server validates → Server issues JWT token
+2. **Session Management**: Token is stored in client's localStorage
+3. **Authentication**: Token is sent with every API request in the Authorization header
+4. **Validation**: Server validates token for each protected endpoint
+5. **Logout**: Token is removed from localStorage
 
-### Modifying the Frontend
+## API Endpoints
 
-The frontend is built with React. Key components:
+| Endpoint | Method | Auth Required | Description |
+|----------|--------|---------------|-------------|
+| `/login` | POST | No | Authenticate a user and receive JWT token |
+| `/register` | POST | No | Create a new user account |
+| `/me` | GET | Yes | Get current authenticated user info |
+| `/change-password` | POST | Yes | Update user password (user-specific) |
+| `/customers` | GET | Yes | Retrieve all customers |
+| `/customers` | POST | Yes | Add a new customer |
 
-- `App.js`: Main application entry point and routing
-- `config.js`: Configuration settings including API URL
-- Component files: `CustomerManagement.js`, `Register.js`, etc.
+### Authentication Headers
+
+For protected endpoints, include the JWT token in request headers:
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+## Frontend Components
+
+The frontend uses React context for global state management, particularly for authentication:
+
+- **AuthContext**: Manages user authentication state across components
+- **Protected Routes**: Automatically redirects unauthorized users
+- **User-Specific Actions**: Actions like password changes only affect the logged-in user
 
 ## Security Features
 
+- **JWT Authentication**: Secure, stateless authentication with expiring tokens
 - **Password Hashing**: Passwords are securely hashed using PBKDF2-HMAC-SHA256 with a high iteration count
+- **Token-Based User Sessions**: Each user has their own session with personalized actions
 - **Input Validation**: All inputs are validated on both client and server sides
+- **Authorization Checks**: API endpoints verify user identity before performing actions
 - **Secure Authentication**: Login system provides minimal error information to prevent username enumeration
 
 ## Validation Rules
@@ -177,6 +214,15 @@ The frontend is built with React. Key components:
 - **Customer Name**: Only English letters and spaces allowed
 
 ## Troubleshooting
+
+### Authentication Issues
+
+If you encounter authentication problems:
+
+1. Check browser console for token-related errors
+2. Verify that the JWT_SECRET_KEY is properly set in your backend .env file
+3. Check token expiration (default is 60 minutes)
+4. Clear localStorage and try logging in again
 
 ### Database Connection Issues
 
@@ -200,6 +246,7 @@ If the frontend can't connect to the API:
 
 1. Verify the API URL in the frontend's `.env` file
 2. Check CORS settings in `main.py` if you're using different hosts or ports
+3. Ensure authentication headers are properly formatted
 
 ### Password Salt Issues
 
@@ -208,3 +255,17 @@ If you encounter authentication problems after setting up:
 1. Make sure you've set a valid `PASSWORD_SALT` value in your `.env` file
 2. The salt must be a valid base64-encoded string
 3. If you change the salt after users are created, existing users won't be able to log in
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- FastAPI for providing an excellent API framework
+- React for the powerful frontend library
+- MySQL for reliable database services
