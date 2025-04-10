@@ -100,11 +100,6 @@ FRONTEND_URL=http://localhost:3000
 # Always use MySQL
 USE_MYSQL=true
 
-# Salt for password hashing
-# This should be a long, random string
-# You can generate one using: openssl rand -base64 32
-PASSWORD_SALT=your_random_salt_string
-
 # JWT Authentication
 # Generate a secure secret key: openssl rand -hex 32
 JWT_SECRET_KEY=your_jwt_secret_key
@@ -171,6 +166,24 @@ The system uses JWT (JSON Web Tokens) for secure, stateless authentication:
 4. **Validation**: Server validates token for each protected endpoint
 5. **Logout**: Token is removed from localStorage
 
+## Password Security
+
+The system uses a secure password hashing mechanism with the following features:
+
+- **PBKDF2-HMAC-SHA256**: Industry-standard password hashing function
+- **High Iteration Count**: 1,200,000 iterations to increase computational cost for attackers
+- **Secure Salt Management**: 
+  - A cryptographically secure random salt is automatically generated during first system use
+  - The salt is stored in a dedicated `salt` table in the database
+  - The same salt is used consistently for all password operations
+  - The salt is generated only once for the entire application
+
+This approach ensures:
+- Passwords are never stored in plaintext
+- The system is protected against rainbow table attacks
+- Consistent security across all user accounts
+- Automatic salt generation without manual configuration
+
 ## API Endpoints
 
 | Endpoint | Method | Auth Required | Description |
@@ -202,6 +215,7 @@ The frontend uses React context for global state management, particularly for au
 
 - **JWT Authentication**: Secure, stateless authentication with expiring tokens
 - **Password Hashing**: Passwords are securely hashed using PBKDF2-HMAC-SHA256 with a high iteration count
+- **Database-Stored Salt**: Password salt is securely stored in the database, generated once at first use
 - **Token-Based User Sessions**: Each user has their own session with personalized actions
 - **Input Validation**: All inputs are validated on both client and server sides
 - **Authorization Checks**: API endpoints verify user identity before performing actions
@@ -247,14 +261,6 @@ If the frontend can't connect to the API:
 1. Verify the API URL in the frontend's `.env` file
 2. Check CORS settings in `main.py` if you're using different hosts or ports
 3. Ensure authentication headers are properly formatted
-
-### Password Salt Issues
-
-If you encounter authentication problems after setting up:
-
-1. Make sure you've set a valid `PASSWORD_SALT` value in your `.env` file
-2. The salt must be a valid base64-encoded string
-3. If you change the salt after users are created, existing users won't be able to log in
 
 ## Contributing
 
