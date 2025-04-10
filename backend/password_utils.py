@@ -2,41 +2,66 @@ import os
 import base64
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from dotenv import load_dotenv
+import secrets
+from sqlalchemy.orm import Session
+from sqlalchemy import Column, String
+from sqlalchemy.ext.declarative import declarative_base
 
-def get_salt():
-    """
-    Load the salt from .env file and convert from base64 to bytes.
-    """
-    # Load variables from .env file - this is redundant if already loaded in main.py
-    # but included here to make this module independently usable
-    load_dotenv()
+Base = declarative_base()
+
+# Define the Salt model
+class Salt(Base):
+    __tablename__ = "salt"
     
-    # Get the salt from environment variables
-    salt_b64 = os.getenv('PASSWORD_SALT')
+    id = Column(String(10), primary_key=True)
+    value = Column(String(255), nullable=False)
+
+def get_or_create_salt(db: Session):
+    """
+    Get the salt from the database or create a new one if it doesn't exist.
     
-    if not salt_b64:
-        raise ValueError("PASSWORD_SALT not found in .env file")
+    Args:
+        db (Session): SQLAlchemy database session
+        
+    Returns:
+        bytes: The salt as bytes
+    """
+    # Try to get the salt from the database
+    salt_record = db.query(Salt).filter(Salt.id == "main").first()
+    
+    if not salt_record:
+        # Generate a new salt (32 bytes is a good length for security)
+        new_salt = secrets.token_bytes(32)
+        # Convert to base64 for storage
+        salt_b64 = base64.b64encode(new_salt).decode('utf-8')
+        
+        # Save the new salt to the database
+        salt_record = Salt(id="main", value=salt_b64)
+        db.add(salt_record)
+        db.commit()
+        
+        return new_salt
     
     # Convert the base64 string to bytes
     try:
-        salt = base64.b64decode(salt_b64)
+        salt = base64.b64decode(salt_record.value)
         return salt
     except Exception as e:
         raise ValueError(f"Failed to decode salt: {e}")
 
-def hash_password(password):
+def hash_password(password, db: Session):
     """
-    Hash a password using PBKDF2 with the salt from .env file.
+    Hash a password using PBKDF2 with the salt from the database.
     
     Args:
         password (str): The password to hash
+        db (Session): SQLAlchemy database session
         
     Returns:
         str: Base64 encoded password hash
     """
-    # Get the salt from .env
-    salt = get_salt()
+    # Get the salt from database or create it if it doesn't exist
+    salt = get_or_create_salt(db)
     
     # Configure the key derivation function
     kdf = PBKDF2HMAC(
@@ -54,19 +79,20 @@ def hash_password(password):
     key = kdf.derive(password)
     return base64.b64encode(key).decode('utf-8')
 
-def verify_password(password, stored_hash):
+def verify_password(password, stored_hash, db: Session):
     """
-    Verify a password against a stored hash using the salt from .env.
+    Verify a password against a stored hash using the salt from the database.
     
     Args:
         password (str): The password to verify
         stored_hash (str): Base64 encoded stored hash to compare against
+        db (Session): SQLAlchemy database session
         
     Returns:
         bool: True if password matches, False otherwise
     """
-    # Get the salt from .env
-    salt = get_salt()
+    # Get the salt from database
+    salt = get_or_create_salt(db)
     
     # Configure the key derivation function
     kdf = PBKDF2HMAC(
