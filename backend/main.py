@@ -9,7 +9,7 @@ import os
 import time
 from dotenv import load_dotenv
 from typing import Optional
-from password_utils import hash_password, verify_password
+from password_utils import hash_password, verify_password, get_or_create_salt, Salt, Base as PasswordBase
 from validation_utils import (
     validate_username, 
     validate_password, 
@@ -92,8 +92,9 @@ class Customer(Base):
     sector = Column(String(50))
     date_added = Column(DateTime, default=datetime.now)
 
-# Create tables in the database
+# Create all tables in the database
 Base.metadata.create_all(bind=engine)
+PasswordBase.metadata.create_all(bind=engine)
 
 # Dependency to get database session
 def get_db():
@@ -177,7 +178,7 @@ def login(data: LoginData, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.username == data.username).first()
 
-    if not user or not verify_password(data.password, user.password):
+    if not user or not verify_password(data.password, user.password, db):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     
     # Create access token with username as subject
@@ -214,7 +215,7 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username or email already registered")
     
     # Create new user with hashed password
-    hashed_password = hash_password(data.password)
+    hashed_password = hash_password(data.password, db)
     new_user = User(username=data.username, email=data.email, password=hashed_password)
     
     db.add(new_user)
@@ -234,11 +235,11 @@ def change_password(data: ChangePasswordData, current_user: User = Depends(get_c
         raise HTTPException(status_code=400, detail=error_message)
     
     # Verify the old password matches the user's current password
-    if not verify_password(data.oldPassword, current_user.password):
+    if not verify_password(data.oldPassword, current_user.password, db):
         raise HTTPException(status_code=401, detail="Invalid current password")
     
     # Update password with new hash
-    current_user.password = hash_password(data.newPassword)
+    current_user.password = hash_password(data.newPassword, db)
     db.commit()
     
     return {"message": "Password changed successfully"}
@@ -298,15 +299,19 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
         "email": current_user.email
     }
 
-# For development/testing: Add initial admin user if not exists
+# Initialize salt on application startup
 @app.on_event("startup")
-def create_initial_users():
+def initialize_application():
     db = SessionLocal()
     try:
+        # Initialize salt if it doesn't exist
+        get_or_create_salt(db)
+        
+        # Create admin user if it doesn't exist
         admin_exists = db.query(User).filter(User.username == "admin").first()
         if not admin_exists:
             # Create admin with hashed password
-            hashed_password = hash_password("admin")
+            hashed_password = hash_password("admin", db)
             admin_user = User(
                 username="admin",
                 email="admin@example.com",
