@@ -52,6 +52,7 @@ function CustomerManagement({ successMessage }) {
       
       if (response.ok) {
         const data = await response.json();
+        // The backend is now sanitizing data, so we can safely use it
         setCustomers(data.customers || []);
       } else {
         setMessage({ text: "Failed to load customers", type: "error" });
@@ -104,6 +105,13 @@ function CustomerManagement({ successMessage }) {
     if (formSubmitted && fieldErrors.sector && value) {
       setFieldErrors({...fieldErrors, sector: ''});
     }
+  };
+
+  // Helper function to safely render potentially escaped HTML
+  const createSafeDisplay = (str) => {
+    // Create a text node instead of using dangerouslySetInnerHTML
+    // This ensures that any sanitized HTML remains properly escaped
+    return str;
   };
 
   // Handle form submission
@@ -304,11 +312,11 @@ function CustomerManagement({ successMessage }) {
                   <tr key={customer.id}>
                     <td className="customer-name-cell">
                       <div className="truncate-text" title={customer.name}>
-                        {customer.name}
+                        {createSafeDisplay(customer.name)}
                       </div>
                     </td>
-                    <td>{customer.internet_package}</td>
-                    <td>{customer.sector}</td>
+                    <td>{createSafeDisplay(customer.internet_package)}</td>
+                    <td>{createSafeDisplay(customer.sector)}</td>
                     <td>{customer.date_added}</td>
                   </tr>
                 ))}

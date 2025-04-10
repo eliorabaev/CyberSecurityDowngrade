@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import os
 import time
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from password_utils import hash_password, verify_password, get_or_create_salt, Salt, Base as PasswordBase
 from validation_utils import (
     validate_username, 
@@ -19,6 +19,7 @@ from validation_utils import (
     validate_sector
 )
 from auth_utils import create_access_token, verify_token
+import html
 
 # Load environment variables
 load_dotenv()
@@ -104,6 +105,13 @@ def get_db():
     finally:
         db.close()
 
+# Helper function to sanitize strings
+def sanitize_string(value: str) -> str:
+    """Escape HTML special characters to prevent XSS"""
+    if value is None:
+        return None
+    return html.escape(value)
+
 # Get current user from token
 async def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     if not authorization:
@@ -170,6 +178,39 @@ class CustomerData(BaseModel):
     internet_package: str
     sector: str
 
+class UserResponse(BaseModel):
+    username: str
+    email: str
+    
+    # Sanitize data to prevent XSS
+    @validator('username', 'email')
+    def sanitize_fields(cls, v):
+        return sanitize_string(v)
+    
+    class Config:
+        from_attributes = True  # Updated from orm_mode = True
+
+class CustomerResponse(BaseModel):
+    id: int
+    name: str
+    internet_package: str
+    sector: str
+    date_added: str  # Use string instead of date type
+    
+    # Sanitize data to prevent XSS
+    @validator('name', 'internet_package', 'sector')
+    def sanitize_fields(cls, v):
+        return sanitize_string(v)
+    
+    class Config:
+        from_attributes = True  # Updated from orm_mode = True
+
+class CustomerListResponse(BaseModel):
+    customers: List[CustomerResponse]
+
+class MessageResponse(BaseModel):
+    message: str
+
 # User endpoints
 @app.post("/login", response_model=TokenResponse)
 def login(data: LoginData, db: Session = Depends(get_db)):
@@ -189,7 +230,7 @@ def login(data: LoginData, db: Session = Depends(get_db)):
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/register")
+@app.post("/register", response_model=MessageResponse)
 def register(data: RegisterData, db: Session = Depends(get_db)):
     # Validate username
     is_valid, error_message = validate_username(data.username)
@@ -223,7 +264,7 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
     
     return {"message": "Registration successful"}
 
-@app.post("/change-password")
+@app.post("/change-password", response_model=MessageResponse)
 def change_password(data: ChangePasswordData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Validate old password exists
     if not data.oldPassword:
@@ -245,7 +286,7 @@ def change_password(data: ChangePasswordData, current_user: User = Depends(get_c
     return {"message": "Password changed successfully"}
 
 # Customer endpoints (protected by authentication)
-@app.post("/customers")
+@app.post("/customers", response_model=MessageResponse)
 def add_customer(data: CustomerData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Validate customer name
     is_valid, error_message = validate_customer_name(data.name)
@@ -278,26 +319,23 @@ def add_customer(data: CustomerData, current_user: User = Depends(get_current_us
 def get_customers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
     
-    # Convert to list of dictionaries for JSON response
+    # Convert to list of dictionaries for JSON response to maintain compatibility
     customer_list = []
     for customer in customers:
         customer_list.append({
             "id": customer.id,
-            "name": customer.name,
-            "internet_package": customer.internet_package,
-            "sector": customer.sector,
+            "name": sanitize_string(customer.name),
+            "internet_package": sanitize_string(customer.internet_package),
+            "sector": sanitize_string(customer.sector),
             "date_added": customer.date_added.strftime("%Y-%m-%d")
         })
     
     return {"customers": customer_list}
 
 # Endpoint to get current user info
-@app.get("/me")
+@app.get("/me", response_model=UserResponse)
 def get_current_user_info(current_user: User = Depends(get_current_user)):
-    return {
-        "username": current_user.username,
-        "email": current_user.email
-    }
+    return current_user
 
 # Initialize salt on application startup
 @app.on_event("startup")
