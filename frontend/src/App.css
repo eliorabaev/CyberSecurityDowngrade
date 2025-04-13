@@ -35,24 +35,42 @@ html, body {
   display: flex;
   justify-content: center;
   align-items: center;
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Root container styling */
+#root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 15px;
+  box-sizing: border-box;
+  height: 100%;
 }
 
 /* Login Box - Main Container */
 .login-box {
   background-color: var(--box-bg);
-  width: 400px; /* Fixed exact width */
+  width: 90%;
+  max-width: 400px;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-color);
-  overflow: hidden; /* Ensure consistent corners */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 0; /* Remove padding from container */
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  margin: 0;
 }
 
 /* Form Content Container */
 .form-content {
-  padding: 40px 40px 20px 40px;
+  padding: 25px 20px 15px 20px; /* Smaller padding on mobile */
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -65,20 +83,20 @@ html, body {
   margin-bottom: 8px;
   color: var(--text-primary);
   font-weight: 600;
-  font-size: 28px;
+  font-size: 24px; /* Smaller font for mobile */
   text-align: center;
 }
 
 /* Subheading text */
 .login-box p {
   width: 100%;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   color: var(--text-secondary);
-  font-size: 16px;
+  font-size: 15px;
   text-align: center;
 }
 
-/* Field Wrapper - Maintains consistent spacing and width */
+/* Field Wrapper */
 .field-wrapper {
   width: 100%;
   margin-bottom: 16px;
@@ -88,7 +106,7 @@ html, body {
 .input-field {
   display: block;
   width: 100%;
-  height: 50px;
+  height: 45px; /* Slightly smaller height for mobile */
   padding: 0 16px;
   background-color: var(--input-bg);
   border: 1px solid var(--border-color);
@@ -137,8 +155,8 @@ html, body {
 /* Connect Button */
 .connect-button {
   width: 100%;
-  height: 50px;
-  margin: 24px 0 16px 0;
+  height: 45px; /* Slightly smaller height for mobile */
+  margin: 20px 0 14px 0;
   background-color: var(--accent-blue);
   color: var(--text-primary);
   border: none;
@@ -171,18 +189,20 @@ html, body {
   text-decoration: none;
   font-size: 14px;
   transition: color 0.2s;
+  
 }
 
 .link:hover {
   color: var(--accent-hover);
   text-decoration: underline;
+  
 }
 
 /* Message Container */
 .login-message-container {
   width: 100%;
-  min-height: 60px;
-  padding: 0 40px 20px 40px;
+  min-height: 50px; /* Smaller for mobile */
+  padding: 0 20px 15px 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -190,11 +210,12 @@ html, body {
 
 .login-message {
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   border-radius: 4px;
   background-color: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
   text-align: center;
+  font-size: 14px; /* Slightly smaller for mobile */
 }
 
 /* Field Error Styling */
@@ -202,61 +223,95 @@ html, body {
   border-color: var(--error-color);
 }
 
-/* Dashboard Styles */
+/* Dashboard Styles - For larger screens, override root centering */
+.dashboard-page {
+  width: 100%;
+  height: 100%;
+  display: block;
+  
+}
+
+/* Ensure the root doesn't center when showing dashboard */
+#root:has(.dashboard-page) {
+  display: block;
+  padding: 0;
+  
+}
+
+/* Dashboard Container */
 .dashboard-container {
   background-color: var(--box-bg);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-  width: 1000px; /* Fixed width */
-  margin: 0 auto;
+  box-shadow: 0 8px 24px rgba(4, 168, 239, 0.2);
+  width: 95%; /* Mobile width */
+  max-width: 1000px; /* Desktop max width */
+  margin:  auto;
   border: 1px solid var(--border-color);
+  height:100% ;
   min-height: 80vh;
   display: flex;
   flex-direction: column;
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  flex: 1;
+  
+  
+  
 }
+
+
 
 /* Dashboard Header */
 .dashboard-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 30px;
+  flex-direction: column; /* Stack on mobile */
+  align-items: flex-start;
+  gap: 15px;
+  padding: 15px 20px;
   border-bottom: 1px solid var(--border-color);
+  
 }
 
 .dashboard-header h1 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 24px;
+  font-size: 22px; /* Smaller for mobile */
+  width: 100%;
+  text-align: center;
 }
 
 /* Dashboard Content Area */
 .dashboard-content {
   display: flex;
   flex-direction: column;
-  padding: 30px;
+  padding: 20px 15px; /* Smaller padding on mobile */
   flex: 1;
+  
+  
 }
+
+
 
 /* Customer Form Container */
 .customer-form-container {
   background-color: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 30px;
+  padding: 15px;
+  margin-bottom: 20px;
 }
 
 .customer-form-container h2 {
   color: var(--text-primary);
-  font-size: 20px;
+  font-size: 18px;
   margin-top: 0;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
-/* Form Row Layout */
+/* Form Row Layout - Mobile First (stack) */
 .form-row {
   display: flex;
-  gap: 15px;
+  flex-direction: column;
+  gap: 10px;
   margin-bottom: 15px;
 }
 
@@ -267,7 +322,7 @@ html, body {
 
 /* Dashboard Message Area */
 .dashboard-message {
-  padding: 0 30px;
+  padding: 0 15px;
   height: 50px;
   display: flex;
   align-items: center;
@@ -279,6 +334,7 @@ html, body {
   padding: 10px;
   border-radius: 6px;
   margin: 0;
+  font-size: 14px; /* Smaller for mobile */
 }
 
 .message.success {
@@ -295,41 +351,71 @@ html, body {
 .customer-table-container {
   background-color: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
-  padding: 20px;
+  padding: 15px;
   flex: 1;
+  overflow-x: auto; /* Allow horizontal scrolling for tables */
 }
 
 .customer-table-container h2 {
   color: var(--text-primary);
-  font-size: 20px;
+  font-size: 18px;
   margin-top: 0;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 /* Table Styling */
 .customer-table {
   width: 100%;
-  table-layout: fixed;
+  min-width: 600px; /* Minimum width to ensure readability */
   border-collapse: collapse;
   color: var(--text-primary);
 }
 
 .customer-table th {
   text-align: left;
-  padding: 12px 15px;
+  padding: 10px;
   background-color: var(--table-header-bg);
   border-bottom: 2px solid var(--border-color);
   font-weight: 600;
-}
-
-.customer-table .customer-name-col {
-  width: 30%;
+  font-size: 14px; /* Smaller for mobile */
 }
 
 .customer-table td {
-  padding: 12px 15px;
+  padding: 10px;
   border-bottom: 1px solid var(--border-color);
   vertical-align: middle;
+  font-size: 14px; /* Smaller for mobile */
+}
+
+/* Mobile card view alternative for very small screens */
+.customer-card {
+  display: none; /* Hidden by default, shown on very small screens via media query */
+  background-color: var(--table-row-odd);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+}
+
+.customer-card-item {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.customer-card-label {
+  font-weight: bold;
+  color: var(--text-secondary);
+}
+
+.customer-card-value {
+  color: var(--text-primary);
+  text-align: right;
+}
+
+/* Table appearance control */
+.customer-table .customer-name-col {
+  width: 30%;
 }
 
 .customer-name-cell {
@@ -356,24 +442,29 @@ html, body {
 .no-data, .loading {
   color: var(--text-secondary);
   text-align: center;
-  padding: 30px 0;
+  padding: 20px 0;
+  font-size: 14px;
 }
 
 /* Header Buttons Container */
 .header-buttons {
   display: flex;
+  flex-wrap: wrap; /* Allow wrapping on very small screens */
   gap: 10px;
-  align-items: center;
+  width: 100%;
+  justify-content: center;
 }
 
 /* User info styling */
 .user-info {
   color: var(--text-secondary);
-  font-size: 14px;
-  margin-right: 15px;
-  padding: 8px 12px;
-  background-color: rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  padding:8px 10px;
+  background-color: rgba(21, 20, 20, 0.05);
   border-radius: 6px;
+  text-align:right;
+  width: 100%;
+  flex: 1;
 }
 
 /* Change Password Button */
@@ -381,10 +472,13 @@ html, body {
   background-color: var(--accent-blue);
   color: white;
   border: none;
-  padding: 8px 16px;
+  padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  font-size: 14px;
+  flex: 1;
+  text-align: center;
 }
 
 .change-password-button:hover {
@@ -396,10 +490,13 @@ html, body {
   background-color: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
-  padding: 8px 16px;
+  padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  font-size: 14px;
+  flex: 1;
+  text-align: center;
 }
 
 .logout-button:hover {
@@ -407,70 +504,205 @@ html, body {
   color: var(--text-primary);
 }
 
-/* Media Queries for Responsiveness */
-@media (max-width: 1050px) {
+/* Button for showing/hiding form on mobile */
+.toggle-form-button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background-color: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Responsive Breakpoints - Using mobile-first approach */
+
+/* Small tablets (600px and up) */
+@media (min-width: 600px) {
+  .form-content {
+    padding: 30px 25px 15px 25px;
+  }
+  
+  .login-box h1 {
+    font-size: 26px;
+  }
+  
+  .login-message-container {
+    padding: 0 25px 20px 25px;
+  }
+  
+  .dashboard-content {
+    padding: 25px 20px;
+  }
+  
+  .customer-table th, 
+  .customer-table td {
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+  
+  .input-field, 
+  .connect-button {
+    height: 48px;
+  }
+  
+  .header-buttons {
+    justify-content: flex-end;
+  }
+  
+  .user-info {
+    width: auto;
+    margin-right: auto;
+  }
+  
+  .change-password-button,
+  .logout-button {
+    flex: 0 0 auto;
+  }
+}
+
+/* Medium screens (768px and up) */
+@media (min-width: 768px) {
+  .dashboard-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+  }
+  
+  .dashboard-header h1 {
+    font-size: 24px;
+    text-align: left;
+    width: auto;
+  }
+  
+  .form-row {
+    flex-direction: row;
+    gap: 15px;
+  }
+  
+  .customer-form-container,
+  .customer-table-container {
+    padding: 20px;
+  }
+  
+  .customer-form-container h2,
+  .customer-table-container h2 {
+    font-size: 20px;
+  }
+}
+
+/* Large screens (1024px and up) */
+@media (min-width: 1024px) {
   .dashboard-container {
-    width: 95%;
+    width: 90%;
     margin: 20px auto;
   }
   
   .dashboard-content {
-    padding: 20px;
+    padding: 30px;
   }
   
-  .form-row {
-    flex-direction: column;
-    gap: 10px;
-  }
-}
-
-@media (max-width: 768px) {
-  .header-buttons {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .user-info {
-    margin-right: 0;
-    margin-bottom: 5px;
-  }
-}
-
-@media (max-width: 640px) {
-  .dashboard-header {
-    flex-direction: column;
-    gap: 15px;
-    align-items: flex-start;
-  }
-  
-  .header-buttons {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-@media (max-width: 480px) {
   .login-box {
-    width: 90%;
+    width: 400px;
   }
   
   .form-content {
-    padding: 30px 20px 15px 20px;
+    padding: 40px 40px 20px 40px;
+  }
+  
+  .login-box h1 {
+    font-size: 28px;
   }
   
   .login-message-container {
-    padding: 0 20px 20px 20px;
+    padding: 0 40px 20px 40px;
+    min-height: 60px;
   }
   
-  .dashboard-header {
-    flex-direction: column;
-    text-align: center;
-    gap: 15px;
+  .input-field, 
+  .connect-button {
+    height: 50px;
+  }
+}
+
+/* Extra large screens (1200px and up) */
+@media (min-width: 1200px) {
+  .dashboard-container {
+    width: 1000px;
+  }
+}
+
+/* Very small screens (under 480px) - Special handling for tables */
+@media (max-width: 480px) {
+  /* Optional: Show card view instead of table on very small screens */
+  .customer-table-wrapper {
+    display: none;
+  }
+  
+  .customer-card {
+    display: block;
+  }
+}
+
+/* Touch device improvements */
+@media (hover: none) {
+  .connect-button,
+  .change-password-button,
+  .logout-button,
+  .toggle-form-button {
+    padding: 12px 16px; /* More padding for touch targets */
+  }
+  
+  .input-field {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    background-color: white;
+  }
+  
+  .dashboard-container {
+    box-shadow: none;
+    border: none;
+  }
+  
+  .header-buttons,
+  .customer-form-container,
+  .toggle-form-button {
+    display: none;
   }
   
   .customer-table {
-    display: block;
-    overflow-x: auto;
+    color: black;
   }
+  
+  .customer-table th {
+    background-color: #f2f2f2;
+    color: black;
+  }
+  
+  .customer-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  
+  .customer-table tr:nth-child(odd) {
+    background-color: white;
+  }
+}
+
+/* Login page specific container class to ensure centering */
+.login-page-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  width: 100%;
 }
