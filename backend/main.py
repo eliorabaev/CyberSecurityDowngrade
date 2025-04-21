@@ -82,7 +82,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True)
     email = Column(String(100), unique=True, index=True)
-    password = Column(String(255))  # Will now store hashed password
+    password = Column(String(255))
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -315,22 +315,23 @@ def add_customer(data: CustomerData, current_user: User = Depends(get_current_us
     
     return {"message": "Customer added successfully"}
 
-@app.get("/customers")
+@app.get("/customers", response_model=CustomerListResponse)
 def get_customers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
     
-    # Convert to list of dictionaries for JSON response to maintain compatibility
-    customer_list = []
+    # Convert to Pydantic models to leverage automatic validation and sanitization
+    customer_responses = []
     for customer in customers:
-        customer_list.append({
-            "id": customer.id,
-            "name": sanitize_string(customer.name),
-            "internet_package": sanitize_string(customer.internet_package),
-            "sector": sanitize_string(customer.sector),
-            "date_added": customer.date_added.strftime("%Y-%m-%d")
-        })
+        customer_responses.append(CustomerResponse(
+            id=customer.id,
+            name=customer.name,
+            internet_package=customer.internet_package,
+            sector=customer.sector,
+            date_added=customer.date_added.strftime("%Y-%m-%d")
+        ))
     
-    return {"customers": customer_list}
+    # Return in format matching CustomerListResponse
+    return {"customers": customer_responses}
 
 # Endpoint to get current user info
 @app.get("/me", response_model=UserResponse)
