@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import config from './config';
-import { validateCustomerName } from './utils/validation';
 import { useAuth } from './AuthContext';
 
 function CustomerManagement({ successMessage }) {
@@ -9,14 +8,6 @@ function CustomerManagement({ successMessage }) {
   const [internetPackage, setInternetPackage] = useState("");
   const [sector, setSector] = useState("");
   const [message, setMessage] = useState({ text: successMessage || "", type: successMessage ? "success" : "" });
-  
-  // Form validation states
-  const [fieldErrors, setFieldErrors] = useState({
-    customerName: '',
-    internetPackage: '',
-    sector: ''
-  });
-  const [formSubmitted, setFormSubmitted] = useState(false);
   
   // State for storing customers
   const [customers, setCustomers] = useState([]);
@@ -71,40 +62,17 @@ function CustomerManagement({ successMessage }) {
     window.location.href = "/?message=Your session has expired. Please log in again.";
   };
 
-  // Handle customer name changes
+  // Simple handlers without validation
   const handleCustomerNameChange = (e) => {
-    const value = e.target.value;
-    setCustomerName(value);
-    
-    // If form was submitted and there was an error that's now fixed
-    if (formSubmitted && fieldErrors.customerName) {
-      const validation = validateCustomerName(value);
-      if (validation.isValid) {
-        setFieldErrors({...fieldErrors, customerName: ''});
-      }
-    }
+    setCustomerName(e.target.value);
   };
 
-  // Handle internet package changes
   const handleInternetPackageChange = (e) => {
-    const value = e.target.value;
-    setInternetPackage(value);
-    
-    // If form was submitted and there was an error that's now fixed
-    if (formSubmitted && fieldErrors.internetPackage && value) {
-      setFieldErrors({...fieldErrors, internetPackage: ''});
-    }
+    setInternetPackage(e.target.value);
   };
 
-  // Handle sector changes
   const handleSectorChange = (e) => {
-    const value = e.target.value;
-    setSector(value);
-    
-    // If form was submitted and there was an error that's now fixed
-    if (formSubmitted && fieldErrors.sector && value) {
-      setFieldErrors({...fieldErrors, sector: ''});
-    }
+    setSector(e.target.value);
   };
 
   // Helper function to safely render potentially escaped HTML
@@ -116,25 +84,6 @@ function CustomerManagement({ successMessage }) {
 
   // Handle form submission
   const handleAddCustomer = async () => {
-    // Mark form as submitted to show validation errors
-    setFormSubmitted(true);
-    
-    // Validate all fields
-    const nameValidation = validateCustomerName(customerName);
-    const errors = {
-      customerName: nameValidation.errorMessage,
-      internetPackage: internetPackage ? '' : 'Please select an internet package',
-      sector: sector ? '' : 'Please select a sector'
-    };
-    
-    setFieldErrors(errors);
-
-    // Check if there are any validation errors
-    if (Object.values(errors).some(error => error !== '')) {
-      setMessage({ text: "Please fix the form errors before submitting", type: "error" });
-      return;
-    }
-
     try {
       // Send customer data to API
       const response = await fetch(`${config.apiUrl}/customers`, {
@@ -163,12 +112,6 @@ function CustomerManagement({ successMessage }) {
         setCustomerName("");
         setInternetPackage("");
         setSector("");
-        setFieldErrors({
-          customerName: '',
-          internetPackage: '',
-          sector: ''
-        });
-        setFormSubmitted(false);
         setMessage({ text: data.message || "Customer added successfully!", type: "success" });
         
         // Refresh the customer list
@@ -232,14 +175,11 @@ function CustomerManagement({ successMessage }) {
               <div className="field-wrapper">
                 <input
                   type="text"
-                  className={`input-field ${formSubmitted && fieldErrors.customerName ? 'input-error' : ''}`}
+                  className="input-field"
                   placeholder="Customer Name"
                   value={customerName}
                   onChange={handleCustomerNameChange}
                 />
-                {formSubmitted && fieldErrors.customerName && 
-                  <div className="error-message">{fieldErrors.customerName}</div>
-                }
                 <div className="requirements-text">
                   Customer name can only contain English letters and spaces.
                 </div>
@@ -249,7 +189,7 @@ function CustomerManagement({ successMessage }) {
             <div className="form-group">
               <div className="field-wrapper">
                 <select
-                  className={`input-field ${formSubmitted && fieldErrors.internetPackage ? 'input-error' : ''}`}
+                  className="input-field"
                   value={internetPackage}
                   onChange={handleInternetPackageChange}
                 >
@@ -258,16 +198,13 @@ function CustomerManagement({ successMessage }) {
                     <option key={index} value={pkg}>{pkg}</option>
                   ))}
                 </select>
-                {formSubmitted && fieldErrors.internetPackage && 
-                  <div className="error-message">{fieldErrors.internetPackage}</div>
-                }
               </div>
             </div>
             
             <div className="form-group">
               <div className="field-wrapper">
                 <select
-                  className={`input-field ${formSubmitted && fieldErrors.sector ? 'input-error' : ''}`}
+                  className="input-field"
                   value={sector}
                   onChange={handleSectorChange}
                 >
@@ -276,9 +213,6 @@ function CustomerManagement({ successMessage }) {
                     <option key={index} value={sec}>{sec}</option>
                   ))}
                 </select>
-                {formSubmitted && fieldErrors.sector && 
-                  <div className="error-message">{fieldErrors.sector}</div>
-                }
               </div>
             </div>
           </div>
