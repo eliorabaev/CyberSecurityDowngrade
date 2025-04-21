@@ -1,4 +1,5 @@
 import re
+import password_config as config
 
 def validate_username(username):
     """
@@ -30,7 +31,7 @@ def validate_username(username):
 
 def validate_password(password):
     """
-    Validate password strength requirements
+    Validate password strength requirements using configuration file
     
     Args:
         password (str): Password to validate
@@ -43,28 +44,31 @@ def validate_password(password):
         return False, "Password is required"
     
     # Check minimum length
-    if len(password) < 8:
-        return False, "Password must be at least 8 characters"
+    if len(password) < config.MIN_LENGTH:
+        return False, f"Password must be at least {config.MIN_LENGTH} characters"
     
     # Check maximum length
-    if len(password) > 50:
-        return False, "Password cannot exceed 50 characters"
+    if len(password) > config.MAX_LENGTH:
+        return False, f"Password cannot exceed {config.MAX_LENGTH} characters"
     
     # Check for uppercase letters
-    if not re.search(r'[A-Z]', password):
+    if config.REQUIRE_UPPERCASE and not re.search(r'[A-Z]', password):
         return False, "Password must include at least one uppercase letter"
     
     # Check for lowercase letters
-    if not re.search(r'[a-z]', password):
+    if config.REQUIRE_LOWERCASE and not re.search(r'[a-z]', password):
         return False, "Password must include at least one lowercase letter"
     
     # Check for digits
-    if not re.search(r'[0-9]', password):
+    if config.REQUIRE_NUMBERS and not re.search(r'[0-9]', password):
         return False, "Password must include at least one number"
     
     # Check for special characters
-    if not re.search(r'[!@#$%^&*()_\-+=<>?/\[\]{}|]', password):
-        return False, "Password must include at least one special character"
+    if config.REQUIRE_SPECIAL_CHARS:
+        # Escape special characters for regex pattern
+        pattern = '[' + re.escape(config.SPECIAL_CHARS) + ']'
+        if not re.search(pattern, password):
+            return False, "Password must include at least one special character"
     
     return True, ""
 
