@@ -1,15 +1,16 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey
+from pydantic import BaseModel, validator
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, timedelta
 import os
 import time
 from dotenv import load_dotenv
-from typing import Optional, List, Dict, Any
-from password_utils import hash_password, verify_password, get_or_create_salt, Salt, Base as PasswordBase
+from typing import Optional, List
+from password_utils import hash_password, verify_password, get_or_create_salt, Base as PasswordBase
+from auth_utils import get_or_create_jwt_secret
 from validation_utils import (
     validate_username, 
     validate_password, 
@@ -129,7 +130,7 @@ async def get_current_user(authorization: Optional[str] = Header(None), db: Sess
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    payload = verify_token(token)
+    payload = verify_token(token, db=db)
     if payload is None:
         raise HTTPException(
             status_code=401, 
@@ -225,7 +226,8 @@ def login(data: LoginData, db: Session = Depends(get_db)):
     # Create access token with username as subject
     access_token = create_access_token(
         data={"sub": user.username},
-        expires_delta=timedelta(minutes=60)  # Token valid for 1 hour
+        expires_delta=timedelta(minutes=60),  # Token valid for 1 hour
+        db=db
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
@@ -345,6 +347,9 @@ def initialize_application():
     try:
         # Initialize salt if it doesn't exist
         get_or_create_salt(db)
+        
+        # Initialize JWT secret if it doesn't exist
+        get_or_create_jwt_secret(db)
         
         # Create admin user if it doesn't exist
         admin_exists = db.query(User).filter(User.username == "admin").first()
