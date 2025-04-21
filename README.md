@@ -3,7 +3,7 @@
 A secure web application for managing internet service customers with a FastAPI backend and React frontend, featuring robust user authentication and session management.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-green.svg)
 
 ## Overview
 
@@ -16,12 +16,16 @@ This comprehensive system provides a secure and user-friendly interface for mana
   - Password hashing with PBKDF2-HMAC-SHA256 (1,200,000 iterations)
   - Database-stored cryptographic salt for consistent security
   - Protection against brute force and replay attacks
+  - Account lockout after 3 failed login attempts
+  - Prevention of password reuse (last 3 passwords)
+  - Dictionary-based password blacklist
 
 - 👤 **Comprehensive User Management**
   - Secure registration with email validation
   - Login with sanitized error messages to prevent username enumeration
   - Self-service password management with secure validation
   - Role-based access for future extensibility
+  - IP address tracking for enhanced security monitoring
 
 - 👥 **Customer Management**
   - Add new customers with validated information
@@ -30,16 +34,17 @@ This comprehensive system provides a secure and user-friendly interface for mana
   - Protection against XSS through automatic HTML escaping
 
 - 🔒 **Full-Stack Security Implementation**
-  - Server-side validation using Pydantic models
-  - Client-side validation for user experience
+  - Robust server-side validation using Pydantic models
+  - Login page frontend validation for user experience
   - Content Security Policy implementation
   - Automatic input sanitization and output escaping
+  - Enhanced brute force protection mechanisms
 
 - 🌐 **Production-Ready Architecture**
   - Responsive React-based interface
   - Dockerized deployment for consistency
   - Environment-based configuration
-  - Separation of concerns between front and backend
+  - Modular, maintainable codebase with proper separation of concerns
 
 ## Architecture Diagram
 
@@ -62,54 +67,59 @@ This comprehensive system provides a secure and user-friendly interface for mana
 
 ```
 /project_root/
-├── README.md                # Project documentation
-├── .gitignore               # Git ignore file
+├── README.md                     # Project documentation
+├── .gitignore                    # Git ignore file
 │
 ├── backend/
-│   ├── .env                 # Backend environment variables (not in git)
-│   ├── .env.example         # Example backend environment variables
-│   ├── docker-compose.yml   # Docker Compose configuration
-│   ├── Dockerfile           # Backend Docker configuration
-│   ├── init.sql             # Database initialization script
-│   ├── main.py              # FastAPI application entry point
-│   │   ├── API routes       # HTTP endpoints
-│   │   ├── Authentication   # Token validation
-│   │   ├── Database models  # SQLAlchemy ORM definitions
-│   │   ├── Pydantic models  # Request/response validation
-│   │   └── Middleware       # CORS, error handling
-│   ├── auth_utils.py        # JWT token generation and verification
-│   ├── password_utils.py    # Secure password hashing and verification
-│   │   ├── Salt management  # Database-stored salt generation/retrieval
-│   │   ├── PBKDF2 hashing   # High-iteration password hashing
-│   │   └── Verification     # Secure comparison functions
-│   ├── validation_utils.py  # Input data validation
-│   │   ├── Username rules   # Length, character restrictions
-│   │   ├── Password rules   # Complexity requirements
-│   │   └── Business rules   # Customer data validation
-│   └── requirements.txt     # Python dependencies
+│   ├── .env                      # Backend environment variables (not in git)
+│   ├── .env.example              # Example backend environment variables
+│   ├── docker-compose.yml        # Docker Compose configuration
+│   ├── Dockerfile                # Backend Docker configuration
+│   ├── init.sql                  # Database initialization script
+│   ├── database.py               # Database connection & configuration
+│   ├── models.py                 # SQLAlchemy database models
+│   ├── main.py                   # FastAPI application entry point
+│   │   ├── API routes            # HTTP endpoints
+│   │   ├── Authentication        # Token validation
+│   │   ├── Pydantic models       # Request/response validation
+│   │   └── Middleware            # CORS, error handling
+│   ├── auth_utils.py             # JWT token generation and verification
+│   ├── password_utils.py         # Secure password hashing and verification
+│   │   ├── Salt management       # Database-stored salt generation/retrieval
+│   │   ├── PBKDF2 hashing        # High-iteration password hashing
+│   │   └── Verification          # Secure comparison functions
+│   ├── validation_utils.py       # Input data validation
+│   │   ├── Username rules        # Length, character restrictions
+│   │   ├── Password rules        # Complexity requirements
+│   │   └── Business rules        # Customer data validation
+│   ├── security_utils.py         # Enhanced security features
+│   │   ├── Password history      # Previous password tracking
+│   │   ├── Login attempts        # Failed login tracking
+│   │   └── Account locking       # Temporary account lockouts
+│   ├── password_config.py        # Password policy configuration
+│   └── requirements.txt          # Python dependencies
 │
 └── frontend/
-    ├── .env                 # Frontend environment variables (not in git)
-    ├── .env.example         # Example frontend environment variables
-    ├── package.json         # Frontend dependencies
-    ├── package-lock.json    # Dependency lock file (not in git)
-    ├── public/              # Static files
-    │   ├── favicon.ico      # Application icon
-    │   ├── index.html       # HTML entry point
-    │   └── robots.txt       # Crawler instructions
-    └── src/                 # React source code
-        ├── App.js           # Main application component
-        ├── App.css          # Main application styles
-        ├── AuthContext.js   # Authentication context provider
-        ├── config.js        # Configuration settings
-        ├── index.js         # React entry point
-        ├── index.css        # Global styles
-        ├── utils/           # Utility functions
-        │   └── validation.js # Client-side validation functions
-        ├── ChangePassword.js # Password management component
+    ├── .env                      # Frontend environment variables (not in git)
+    ├── .env.example              # Example frontend environment variables
+    ├── package.json              # Frontend dependencies
+    ├── package-lock.json         # Dependency lock file (not in git)
+    ├── public/                   # Static files
+    │   ├── favicon.ico           # Application icon
+    │   ├── index.html            # HTML entry point
+    │   └── robots.txt            # Crawler instructions
+    └── src/                      # React source code
+        ├── App.js                # Main application component
+        ├── App.css               # Main application styles
+        ├── AuthContext.js        # Authentication context provider
+        ├── config.js             # Configuration settings
+        ├── index.js              # React entry point
+        ├── index.css             # Global styles
+        ├── utils/                # Utility functions
+        ├── ChangePassword.js     # Password management component
         ├── CustomerManagement.js # Customer CRUD operations
-        ├── ForgotPassword.js # Password recovery component
-        └── Register.js      # User registration component
+        ├── ForgotPassword.js     # Password recovery component
+        └── Register.js           # User registration component
 ```
 
 ## Technology Stack
@@ -138,6 +148,43 @@ This comprehensive system provides a secure and user-friendly interface for mana
 - **Docker**: Containerization for consistent environments
 - **Docker Compose**: Multi-container orchestration
 
+## Enhanced Security Features
+
+### Advanced Authentication Protection
+
+#### Password Policy Enforcement
+The system now enforces a robust password policy:
+
+1. **Password History Tracking**:
+   - Prevents reuse of the last 3 passwords
+   - Stores securely hashed password history
+   - Enforces during password change operations
+
+2. **Dictionary Password Prevention**:
+   - Maintains a comprehensive list of common passwords
+   - Prevents use of easily guessable passwords
+   - Case-insensitive matching for better protection
+
+3. **Brute Force Protection**:
+   - Account lockout after 3 failed login attempts
+   - 30-minute lockout duration
+   - IP address tracking for security forensics
+   - User-friendly notifications about account status
+
+#### Centralized Security Configuration
+The system uses a modular approach to security settings:
+
+1. **Configurable Security Parameters**:
+   - Password complexity requirements in `password_config.py`
+   - Password history depth setting
+   - Failed login attempt thresholds
+   - Account lockout duration
+
+2. **Database Structure for Security**:
+   - Password history tracking tables
+   - Login attempt monitoring tables
+   - Account status tracking tables
+
 ## Detailed Security Implementation
 
 ### Authentication Security
@@ -147,7 +194,7 @@ The system employs a secure password hashing implementation:
 
 1. **Salt Generation & Storage**:
    - A 32-byte (256-bit) cryptographically secure random salt is generated at first application startup
-   - The salt is stored in a dedicated `salt` table in the database with ID "main"
+   - The salt is stored in a dedicated `secrets` table in the database with ID "main"
    - This approach ensures consistent salt usage across application instances
 
 2. **Password Hashing Algorithm**:
@@ -181,17 +228,18 @@ The system implements secure JWT (JSON Web Token) authentication:
 ### Data Security
 
 #### Input Validation
-The system implements multiple layers of validation:
+The system implements a two-tier validation strategy:
 
-1. **Frontend Validation**:
-   - Real-time feedback for users
-   - Regular expression pattern matching
-   - Length and character restrictions
+1. **Login Page Frontend Validation**:
+   - Real-time feedback on login page only
+   - Basic validation for user experience
 
-2. **API Validation**:
+2. **Robust Server-Side Validation**:
+   - Primary validation mechanism for all endpoints
    - Pydantic models for request body validation
    - Type checking and constraint enforcement
    - Detailed error messaging for debugging
+   - Protection against malformed or malicious data
 
 3. **Database Validation**:
    - SQLAlchemy column constraints
@@ -339,14 +387,21 @@ The system implements a secure JWT-based authentication flow:
 
 1. **User Registration**:
    - Client submits username, email, and password
-   - Server validates input data
+   - Server validates input data, checking against the password blacklist
    - Password is hashed using PBKDF2-HMAC-SHA256
    - User record is created in database
+   - Initial password is added to password history
    - Success response is returned (no auto-login)
 
 2. **User Login**:
+   - Client provides basic validation on the login form
    - Client submits username and password
-   - Server validates credentials
+   - Server checks for previous failed attempts
+   - If account is locked, login is denied with appropriate message
+   - If not locked, server validates credentials
+   - Failed attempts are recorded with IP address
+   - If failure limit is reached, account is locked for 30 minutes
+   - On success, failed attempt counter is reset
    - Server creates signed JWT with 1-hour expiration
    - Token is returned to client
    - Client stores token in localStorage
@@ -361,7 +416,9 @@ The system implements a secure JWT-based authentication flow:
 4. **Password Change**:
    - Client submits old and new passwords with token
    - Server validates token and old password
+   - New password is checked against password history and blacklist
    - New password is hashed and stored
+   - Password is added to password history
    - Success response indicates completion
 
 5. **Logout Process**:
@@ -395,6 +452,8 @@ Authenticates a user and provides a JWT token.
 **Error Responses:**
 - `400 Bad Request`: Missing username or password
 - `401 Unauthorized`: Invalid credentials
+- `423 Locked`: Account is temporarily locked
+- `429 Too Many Requests`: Too many failed login attempts
 
 #### `POST /register`
 Creates a new user account.
@@ -416,7 +475,7 @@ Creates a new user account.
 ```
 
 **Error Responses:**
-- `400 Bad Request`: Validation error or existing username/email
+- `400 Bad Request`: Validation error, common password, or existing username/email
 
 #### `GET /me`
 Retrieves information about the authenticated user.
@@ -461,7 +520,7 @@ Authorization: Bearer <token>
 ```
 
 **Error Responses:**
-- `400 Bad Request`: Invalid new password
+- `400 Bad Request`: Invalid new password, common password, or password in history
 - `401 Unauthorized`: Invalid old password or token
 
 ### Customer Management Endpoints
@@ -529,12 +588,14 @@ Authorization: Bearer <token>
 - Required field (cannot be empty)
 
 ### Password Validation
-- Minimum 8 characters
-- Maximum 50 characters
+- Minimum 10 characters (configurable)
+- Maximum 50 characters (configurable)
 - Must include at least one uppercase letter
 - Must include at least one lowercase letter
 - Must include at least one number
 - Must include at least one special character
+- Cannot be one of the common passwords in the blacklist
+- Cannot be one of the user's last 3 passwords
 - Required field (cannot be empty)
 
 ### Email Validation
