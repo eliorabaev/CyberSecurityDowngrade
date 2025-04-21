@@ -6,6 +6,7 @@ import secrets
 import base64
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
+from models import Secret
 
 # Load environment variables (keep for fallback values)
 load_dotenv()
@@ -24,9 +25,6 @@ def get_or_create_jwt_secret(db: Session):
     Returns:
         str: The JWT secret key
     """
-    # Import here to avoid circular imports
-    from password_utils import Secret
-    
     # Try to get the JWT secret from the database
     secret_record = db.query(Secret).filter(Secret.id == "jwt_secret").first()
     

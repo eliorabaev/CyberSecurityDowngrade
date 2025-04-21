@@ -1,40 +1,8 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import Session
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.sql import func
 from datetime import datetime, timedelta
 import password_config as config
-from password_utils import hash_password, verify_password, Base as PasswordBase
-
-Base = PasswordBase
-
-# Model to store password history
-class PasswordHistory(Base):
-    __tablename__ = "password_history"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.now)
-
-# Model to track login attempts
-class LoginAttempt(Base):
-    __tablename__ = "login_attempts"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), index=True)
-    attempt_time = Column(DateTime, default=datetime.now)
-    successful = Column(Boolean, default=False)
-    ip_address = Column(String(45), nullable=True)  # Supports IPv6 addresses
-
-# Model to track account status
-class AccountStatus(Base):
-    __tablename__ = "account_status"
-    
-    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
-    is_locked = Column(Boolean, default=False)
-    locked_until = Column(DateTime, nullable=True)
-    failed_attempts = Column(Integer, default=0)
+from password_utils import hash_password, verify_password
+from models import PasswordHistory, LoginAttempt, AccountStatus
 
 def check_password_history(user_id: int, new_password: str, db: Session) -> bool:
     """

@@ -1,5 +1,8 @@
 import re
 import password_config as config
+from security_utils import is_password_in_disallowed_list, check_password_history
+from sqlalchemy.orm import Session
+from typing import Optional
 
 def validate_username(username):
     """
@@ -29,12 +32,14 @@ def validate_username(username):
     
     return True, ""
 
-def validate_password(password):
+def validate_password(password, user_id: Optional[int] = None, db: Optional[Session] = None):
     """
     Validate password strength requirements using configuration file
     
     Args:
         password (str): Password to validate
+        user_id (int, optional): User ID for checking password history
+        db (Session, optional): Database session for checking password history
         
     Returns:
         tuple: (is_valid, error_message)
@@ -69,6 +74,15 @@ def validate_password(password):
         pattern = '[' + re.escape(config.SPECIAL_CHARS) + ']'
         if not re.search(pattern, password):
             return False, "Password must include at least one special character"
+    
+    # Check against disallowed passwords dictionary
+    if is_password_in_disallowed_list(password):
+        return False, "Password is too common and easily guessable"
+    
+    # Check password history if user_id and db are provided
+    if user_id is not None and db is not None:
+        if not check_password_history(user_id, password, db):
+            return False, f"Password cannot be one of your last {config.PASSWORD_HISTORY_LENGTH} passwords"
     
     return True, ""
 
