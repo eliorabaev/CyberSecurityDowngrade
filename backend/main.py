@@ -1,15 +1,16 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey
+from pydantic import BaseModel, validator
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, timedelta
 import os
 import time
 from dotenv import load_dotenv
-from typing import Optional, List, Dict, Any
-from password_utils import hash_password, verify_password, get_or_create_salt, Salt, Base as PasswordBase
+from typing import Optional, List
+from password_utils import hash_password, verify_password, get_or_create_salt, Base as PasswordBase
+from auth_utils import get_or_create_jwt_secret
 from validation_utils import (
     validate_username, 
     validate_password, 
@@ -82,7 +83,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True)
     email = Column(String(100), unique=True, index=True)
-    password = Column(String(255))  # Will now store hashed password
+    password = Column(String(255))
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -129,7 +130,7 @@ async def get_current_user(authorization: Optional[str] = Header(None), db: Sess
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    payload = verify_token(token)
+    payload = verify_token(token, db=db)
     if payload is None:
         raise HTTPException(
             status_code=401, 
@@ -225,7 +226,8 @@ def login(data: LoginData, db: Session = Depends(get_db)):
     # Create access token with username as subject
     access_token = create_access_token(
         data={"sub": user.username},
-        expires_delta=timedelta(minutes=60)  # Token valid for 1 hour
+        expires_delta=timedelta(minutes=60),  # Token valid for 1 hour
+        db=db
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
@@ -315,22 +317,23 @@ def add_customer(data: CustomerData, current_user: User = Depends(get_current_us
     
     return {"message": "Customer added successfully"}
 
-@app.get("/customers")
+@app.get("/customers", response_model=CustomerListResponse)
 def get_customers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
     
-    # Convert to list of dictionaries for JSON response to maintain compatibility
-    customer_list = []
+    # Convert to Pydantic models to leverage automatic validation and sanitization
+    customer_responses = []
     for customer in customers:
-        customer_list.append({
-            "id": customer.id,
-            "name": sanitize_string(customer.name),
-            "internet_package": sanitize_string(customer.internet_package),
-            "sector": sanitize_string(customer.sector),
-            "date_added": customer.date_added.strftime("%Y-%m-%d")
-        })
+        customer_responses.append(CustomerResponse(
+            id=customer.id,
+            name=customer.name,
+            internet_package=customer.internet_package,
+            sector=customer.sector,
+            date_added=customer.date_added.strftime("%Y-%m-%d")
+        ))
     
-    return {"customers": customer_list}
+    # Return in format matching CustomerListResponse
+    return {"customers": customer_responses}
 
 # Endpoint to get current user info
 @app.get("/me", response_model=UserResponse)
@@ -344,6 +347,9 @@ def initialize_application():
     try:
         # Initialize salt if it doesn't exist
         get_or_create_salt(db)
+        
+        # Initialize JWT secret if it doesn't exist
+        get_or_create_jwt_secret(db)
         
         # Create admin user if it doesn't exist
         admin_exists = db.query(User).filter(User.username == "admin").first()

@@ -9,9 +9,9 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-# Define the Salt model
-class Salt(Base):
-    __tablename__ = "salt"
+# Renamed class and changed table name
+class Secret(Base):
+    __tablename__ = "secrets"
     
     id = Column(String(10), primary_key=True)
     value = Column(String(255), nullable=False)
@@ -26,8 +26,8 @@ def get_or_create_salt(db: Session):
     Returns:
         bytes: The salt as bytes
     """
-    # Try to get the salt from the database
-    salt_record = db.query(Salt).filter(Salt.id == "main").first()
+    # Updated to use the Secret model instead of Salt
+    salt_record = db.query(Secret).filter(Secret.id == "main").first()
     
     if not salt_record:
         # Generate a new salt (32 bytes is a good length for security)
@@ -35,8 +35,8 @@ def get_or_create_salt(db: Session):
         # Convert to base64 for storage
         salt_b64 = base64.b64encode(new_salt).decode('utf-8')
         
-        # Save the new salt to the database
-        salt_record = Salt(id="main", value=salt_b64)
+        # Save the new salt to the database using the new model
+        salt_record = Secret(id="main", value=salt_b64)
         db.add(salt_record)
         db.commit()
         
