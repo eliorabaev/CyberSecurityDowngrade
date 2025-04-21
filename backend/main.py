@@ -1,16 +1,18 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, validator
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, timedelta
 import os
-import time
 from dotenv import load_dotenv
 from typing import Optional, List
-from password_utils import hash_password, verify_password, get_or_create_salt, Base as PasswordBase
-from auth_utils import get_or_create_jwt_secret
+import html
+import password_config as config
+
+# Import from our new modules
+from database import engine, get_db, Base
+from models import User, Customer, Secret, PasswordHistory, LoginAttempt, AccountStatus
+from password_utils import hash_password, verify_password, get_or_create_salt
+from auth_utils import create_access_token, verify_token, get_or_create_jwt_secret
 from validation_utils import (
     validate_username, 
     validate_password, 
@@ -19,8 +21,16 @@ from validation_utils import (
     validate_internet_package,
     validate_sector
 )
-from auth_utils import create_access_token, verify_token
-import html
+from security_utils import (
+    record_login_attempt, 
+    get_recent_failed_attempts, 
+    is_account_locked, 
+    increment_failed_attempts, 
+    reset_failed_attempts,
+    add_password_to_history
+)
+
+from sqlalchemy.orm import Session
 
 # Load environment variables
 load_dotenv()
@@ -39,72 +49,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database connection from environment variables
-DB_USER = os.getenv("DB_USER", "isp_user")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "dev_password")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "internet_service_provider")
-
-# Create database URL
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
-
-# Function to attempt database connection with retries
-def connect_with_retry(url, retries=20, delay=3):
-    """Connect to database with retry logic"""
-    print(f"Attempting to connect to database at {DB_HOST}...")
-    
-    for i in range(retries):
-        try:
-            engine = create_engine(url)
-            # Test the connection
-            with engine.connect() as conn:
-                pass
-            print(f"Successfully connected to database at {DB_HOST}")
-            return engine
-        except Exception as e:
-            if i < retries - 1:
-                print(f"Database connection failed. Retrying in {delay} seconds... ({i+1}/{retries})")
-                print(f"Error: {str(e)}")
-                time.sleep(delay)
-            else:
-                print("Maximum retries reached. Could not connect to the database.")
-                print(f"Final error: {str(e)}")
-                raise
-
-# Create engine with retry mechanism
-engine = connect_with_retry(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# Define the database models
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True)
-    email = Column(String(100), unique=True, index=True)
-    password = Column(String(255))
-
-class Customer(Base):
-    __tablename__ = "customers"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), index=True)
-    internet_package = Column(String(50))
-    sector = Column(String(50))
-    date_added = Column(DateTime, default=datetime.now)
-
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)
-PasswordBase.metadata.create_all(bind=engine)
-
-# Dependency to get database session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # Helper function to sanitize strings
 def sanitize_string(value: str) -> str:
@@ -214,14 +160,47 @@ class MessageResponse(BaseModel):
 
 # User endpoints
 @app.post("/login", response_model=TokenResponse)
-def login(data: LoginData, db: Session = Depends(get_db)):
+def login(data: LoginData, request: Request, db: Session = Depends(get_db)):
     if not data.username or not data.password:
         raise HTTPException(status_code=400, detail="Username and password are required")
 
+    # Get user's IP address for logging
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Check if username exists
     user = db.query(User).filter(User.username == data.username).first()
-
-    if not user or not verify_password(data.password, user.password, db):
+    
+    # Check max login attempts for this username
+    recent_attempts = get_recent_failed_attempts(data.username, db)
+    if recent_attempts >= config.MAX_LOGIN_ATTEMPTS:
+        # Record the attempt
+        record_login_attempt(data.username, False, client_ip, db)
+        raise HTTPException(status_code=429, detail="Too many failed login attempts. Try again later.")
+    
+    # Check if user exists
+    if not user:
+        # Record failed attempt
+        record_login_attempt(data.username, False, client_ip, db)
         raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    # Check if account is locked
+    is_locked, lock_message = is_account_locked(user.id, db)
+    if is_locked:
+        # Record the attempt
+        record_login_attempt(data.username, False, client_ip, db)
+        raise HTTPException(status_code=423, detail=lock_message)
+    
+    # Verify password
+    if not verify_password(data.password, user.password, db):
+        # Record failed attempt and increment counter
+        record_login_attempt(data.username, False, client_ip, db)
+        increment_failed_attempts(user.id, db)
+        
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    # Login successful - reset failed attempts and record success
+    record_login_attempt(data.username, True, client_ip, db)
+    reset_failed_attempts(user.id, db)
     
     # Create access token with username as subject
     access_token = create_access_token(
@@ -263,6 +242,10 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
     
     db.add(new_user)
     db.commit()
+    db.refresh(new_user)
+    
+    # Add the password to history
+    add_password_to_history(new_user.id, hashed_password, db)
     
     return {"message": "Registration successful"}
 
@@ -272,8 +255,8 @@ def change_password(data: ChangePasswordData, current_user: User = Depends(get_c
     if not data.oldPassword:
         raise HTTPException(status_code=400, detail="Current password is required")
     
-    # Validate new password
-    is_valid, error_message = validate_password(data.newPassword)
+    # Validate new password with history check
+    is_valid, error_message = validate_password(data.newPassword, current_user.id, db)
     if not is_valid:
         raise HTTPException(status_code=400, detail=error_message)
     
@@ -282,8 +265,12 @@ def change_password(data: ChangePasswordData, current_user: User = Depends(get_c
         raise HTTPException(status_code=401, detail="Invalid current password")
     
     # Update password with new hash
-    current_user.password = hash_password(data.newPassword, db)
+    new_hashed_password = hash_password(data.newPassword, db)
+    current_user.password = new_hashed_password
     db.commit()
+    
+    # Add the new password to history
+    add_password_to_history(current_user.id, new_hashed_password, db)
     
     return {"message": "Password changed successfully"}
 
@@ -343,7 +330,7 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
 # Initialize salt on application startup
 @app.on_event("startup")
 def initialize_application():
-    db = SessionLocal()
+    db = next(get_db())
     try:
         # Initialize salt if it doesn't exist
         get_or_create_salt(db)

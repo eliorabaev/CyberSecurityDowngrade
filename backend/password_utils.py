@@ -4,17 +4,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import secrets
 from sqlalchemy.orm import Session
-from sqlalchemy import Column, String
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
-
-# Renamed class and changed table name
-class Secret(Base):
-    __tablename__ = "secrets"
-    
-    id = Column(String(10), primary_key=True)
-    value = Column(String(255), nullable=False)
+from models import Secret
 
 def get_or_create_salt(db: Session):
     """
@@ -26,7 +16,7 @@ def get_or_create_salt(db: Session):
     Returns:
         bytes: The salt as bytes
     """
-    # Updated to use the Secret model instead of Salt
+    # Get salt from the Secret model
     salt_record = db.query(Secret).filter(Secret.id == "main").first()
     
     if not salt_record:
@@ -35,7 +25,7 @@ def get_or_create_salt(db: Session):
         # Convert to base64 for storage
         salt_b64 = base64.b64encode(new_salt).decode('utf-8')
         
-        # Save the new salt to the database using the new model
+        # Save the new salt to the database
         salt_record = Secret(id="main", value=salt_b64)
         db.add(salt_record)
         db.commit()
