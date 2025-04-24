@@ -3,7 +3,7 @@
 A secure web application for managing internet service customers with a FastAPI backend and React frontend, featuring robust user authentication and session management.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.1.0-green.svg)
+![Version](https://img.shields.io/badge/version-1.2.0-green.svg)
 
 ## Overview
 
@@ -19,11 +19,13 @@ This comprehensive system provides a secure and user-friendly interface for mana
   - Account lockout after 3 failed login attempts
   - Prevention of password reuse (last 3 passwords)
   - Dictionary-based password blacklist
+  - Secure password reset flow with time-limited verification
 
 - 👤 **Comprehensive User Management**
   - Secure registration with email validation
   - Login with sanitized error messages to prevent username enumeration
   - Self-service password management with secure validation
+  - Three-step password reset process with verification codes
   - Role-based access for future extensibility
   - IP address tracking for enhanced security monitoring
 
@@ -88,6 +90,7 @@ This comprehensive system provides a secure and user-friendly interface for mana
 │   │   ├── Pydantic models       # Request/response validation
 │   │   └── Middleware            # CORS, error handling
 │   ├── auth_utils.py             # JWT token generation and verification
+│   ├── email_utils.py            # Email service for password reset
 │   ├── password_utils.py         # Secure password hashing and verification
 │   │   ├── Salt management       # Database-stored salt generation/retrieval
 │   │   ├── PBKDF2 hashing        # High-iteration password hashing
@@ -175,6 +178,12 @@ The system now enforces a robust password policy:
    - IP address tracking for security forensics
    - User-friendly notifications about account status
 
+4. **Secure Password Reset**:
+   - Three-step verification process (email → token → password)
+   - Time-limited verification codes (20-minute expiration)
+   - Single-use verification tokens
+   - Separation of verification and password reset steps
+
 #### Centralized Security Configuration
 The system uses a modular approach to security settings:
 
@@ -188,6 +197,7 @@ The system uses a modular approach to security settings:
    - Password history tracking tables
    - Login attempt monitoring tables
    - Account status tracking tables
+   - Password reset token tables
 
 ## Detailed Security Implementation
 
@@ -233,6 +243,28 @@ The system implements secure JWT (JSON Web Token) authentication:
    - Secure storage in localStorage
    - Automatic inclusion in API request headers
    - Session termination on logout
+
+#### Password Reset Process
+The system implements a secure three-step password reset flow:
+
+1. **Email Request (Step 1)**:
+   - User submits email address
+   - System generates a secure SHA-1 verification code
+   - Code is stored with a 20-minute expiration time
+   - In development mode, code is displayed in console
+   - In production mode, code is sent via email
+
+2. **Code Verification (Step 2)**:
+   - User submits verification code
+   - Backend validates code against stored token
+   - Token must be unexpired and unused
+   - Authorization to reset password granted only after verification
+
+3. **Password Reset (Step 3)**:
+   - User submits new password with verified token
+   - Password is validated against security policy
+   - Token is marked as used after successful reset
+   - User receives confirmation of successful reset
 
 ### Data Security
 
@@ -373,6 +405,14 @@ FRONTEND_URL=http://localhost:3000
 
 # Always use MySQL - future support for other databases planned
 USE_MYSQL=true
+
+# Email Settings for password reset (minimum required for DEV mode)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_FROM=noreply@yourcompany.com
+# For production, add these settings:
+# EMAIL_USER=your_email@gmail.com
+# EMAIL_PASSWORD=your_app_password
 ```
 
 > **Security Note**: For production environments, use a password manager or secure secret generator to create unique, high-entropy passwords and keys.
@@ -479,7 +519,16 @@ The system implements a secure JWT-based authentication flow:
    - Server verifies user exists in database
    - Request is processed if authentication succeeds
 
-4. **Password Change**:
+4. **Password Reset Flow**:
+   - User requests password reset by entering email
+   - System generates verification code with 20-minute expiration
+   - In development mode, code appears in server console
+   - In production mode, code is sent via email
+   - User enters verification code for validation
+   - After successful validation, user sets new password
+   - Token is invalidated after successful password reset
+
+5. **Password Change**:
    - Client submits old and new passwords with token
    - Server validates token and old password
    - New password is checked against password history and blacklist
@@ -487,10 +536,24 @@ The system implements a secure JWT-based authentication flow:
    - Password is added to password history
    - Success response indicates completion
 
-5. **Logout Process**:
+6. **Logout Process**:
    - Client removes token from localStorage
    - No server-side action required (stateless authentication)
    - User must re-authenticate to access protected resources
+
+## Testing Password Reset (Development Mode)
+
+For development testing of the password reset functionality:
+
+1. Request a password reset by entering an email address
+2. Check the server console output for the verification code
+   ```
+   [DEV MODE] Password reset verification code for user@example.com: a1b2c3d4e5...
+   ```
+3. Enter this code in the verification step
+4. Create a new password after verification
+
+For production use, configure `EMAIL_USER` and `EMAIL_PASSWORD` in your `.env` file to send actual emails with verification codes.
 
 ## Detailed API Documentation
 
@@ -542,6 +605,66 @@ Creates a new user account.
 
 **Error Responses:**
 - `400 Bad Request`: Validation error, common password, or existing username/email
+
+#### `POST /forgot-password`
+Initiates the password reset process.
+
+**Request Body:**
+```json
+{
+  "email": "string"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "If an account with this email exists, a verification code has been sent."
+}
+```
+
+#### `POST /verify-reset-token`
+Verifies the reset token before allowing password change.
+
+**Request Body:**
+```json
+{
+  "email": "string",
+  "token": "string"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Verification code is valid. Please set a new password."
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid or expired verification code
+
+#### `POST /reset-password`
+Resets the password using a verified token.
+
+**Request Body:**
+```json
+{
+  "email": "string",
+  "token": "string",
+  "new_password": "string"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "message": "Password has been reset successfully"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request`: Invalid token or password validation failure
 
 #### `GET /me`
 Retrieves information about the authenticated user.
