@@ -1,19 +1,27 @@
+// Updated ForgotPassword.js component
 import React, { useState } from 'react';
 import config from './config';
 
 function ForgotPassword() {
+  // State variables
   const [email, setEmail] = useState("");
+  const [token, setToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Track the current step in the password reset flow
+  const [currentStep, setCurrentStep] = useState("email"); // "email", "token", or "password"
 
-  const handleForgotPassword = async () => {
+  // Handle email form submission
+  const handleSubmitEmail = async () => {
+    if (!email) {
+      setMessage("Please enter your email address");
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      // Frontend-only implementation for now
-      setMessage("If an account with this email exists, password reset instructions have been sent. This is a frontend demo.");
-      
-      // When backend is ready, uncomment this code:
-      /*
       const response = await fetch(`${config.apiUrl}/forgot-password`, {
         method: "POST",
         headers: {
@@ -25,47 +33,155 @@ function ForgotPassword() {
       if (response.ok) {
         const data = await response.json();
         setMessage(data.message);
+        // Move to token verification step
+        setCurrentStep("token");
       } else {
         const errorData = await response.json();
         setMessage(errorData.detail || "Request failed");
       }
-      */
     } catch (error) {
-      setMessage("An error occurred");
       console.error("Forgot password error:", error);
+      setMessage("Error connecting to server");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle token verification and new password submission
+  const handleResetPassword = async () => {
+    if (!token) {
+      setMessage("Please enter the verification code from your email");
+      return;
+    }
+    
+    if (!newPassword) {
+      setMessage("Please enter a new password");
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${config.apiUrl}/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          token,
+          new_password: newPassword
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessage(data.message);
+        
+        // After successful password reset, redirect to login page after 2 seconds
+        setTimeout(() => {
+          window.location.href = "/?message=Your password has been reset successfully.";
+        }, 2000);
+      } else {
+        const errorData = await response.json();
+        setMessage(errorData.detail || "Password reset failed");
+      }
+    } catch (error) {
+      console.error("Reset password error:", error);
+      setMessage("Error connecting to server");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Render email submission form
+  const renderEmailForm = () => (
+    <>
+      <h1>Forgot Password</h1>
+      <p>Enter your email to receive a verification code</p>
+
+      <div className="field-wrapper">
+        <input
+          type="email"
+          className="input-field"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={isLoading}
+        />
+      </div>
+
+      <button 
+        className="connect-button" 
+        onClick={handleSubmitEmail}
+        disabled={isLoading}
+      >
+        {isLoading ? "Sending..." : "Send Verification Code"}
+      </button>
+    </>
+  );
+
+  // Render token verification and new password form
+  const renderTokenAndPasswordForm = () => (
+    <>
+      <h1>Reset Password</h1>
+      <p>Enter the verification code sent to your email</p>
+
+      <div className="field-wrapper">
+        <input
+          type="text"
+          className="input-field"
+          placeholder="Verification Code"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          disabled={isLoading}
+        />
+      </div>
+
+      <div className="field-wrapper">
+        <input
+          type="password"
+          className="input-field"
+          placeholder="New Password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          disabled={isLoading}
+        />
+        <div className="requirements-text">
+          Password must be at least 10 characters and include uppercase, lowercase, 
+          numbers, and special characters.
+        </div>
+      </div>
+
+      <button 
+        className="connect-button" 
+        onClick={handleResetPassword}
+        disabled={isLoading}
+      >
+        {isLoading ? "Resetting..." : "Reset Password"}
+      </button>
+    </>
+  );
+
   return (
     <div className="login-box">
       <div className="form-content">
-        <h1>Forgot Password</h1>
-        <p>Enter your email to receive a password reset link</p>
-
-        <div className="field-wrapper">
-          <input
-            type="email"
-            className="input-field"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
-          />
-        </div>
-
-        <button 
-          className="connect-button" 
-          onClick={handleForgotPassword}
-          disabled={isLoading}
-        >
-          {isLoading ? "Sending..." : "Send Reset Link"}
-        </button>
+        {currentStep === "email" ? renderEmailForm() : renderTokenAndPasswordForm()}
 
         <div className="links">
           <a href="/" className="link">Return to Login</a>
-          <span></span> {/* Empty span to maintain the space-between layout */}
+          {currentStep === "token" && (
+            <a 
+              href="#" 
+              className="link" 
+              onClick={(e) => {
+                e.preventDefault();
+                setCurrentStep("email");
+                setMessage("");
+              }}
+            >
+              Use Different Email
+            </a>
+          )}
         </div>
       </div>
 
