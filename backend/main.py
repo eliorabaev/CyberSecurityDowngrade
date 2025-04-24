@@ -7,12 +7,15 @@ from dotenv import load_dotenv
 from typing import Optional, List
 import html
 import password_config as config
+from datetime import datetime, timedelta
+from models import PasswordResetToken
 
 # Import from our new modules
 from database import engine, get_db, Base
 from models import User, Customer, Secret, PasswordHistory, LoginAttempt, AccountStatus
 from password_utils import hash_password, verify_password, get_or_create_salt
 from auth_utils import create_access_token, verify_token, get_or_create_jwt_secret
+from email_utils import generate_reset_token, send_password_reset_email 
 from validation_utils import (
     validate_username, 
     validate_password, 
@@ -158,6 +161,18 @@ class CustomerListResponse(BaseModel):
 class MessageResponse(BaseModel):
     message: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    token: str
+    new_password: str
+
+class VerifyTokenRequest(BaseModel):
+    email: str
+    token: str
+
 # User endpoints
 @app.post("/login", response_model=TokenResponse)
 def login(data: LoginData, request: Request, db: Session = Depends(get_db)):
@@ -249,6 +264,90 @@ def register(data: RegisterData, db: Session = Depends(get_db)):
     
     return {"message": "Registration successful"}
 
+@app.post("/forgot-password", response_model=MessageResponse)
+def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Initiate password reset process by sending a reset token via email"""
+    # Validate email
+    is_valid, error_message = validate_email(data.email)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
+    # Find user by email
+    user = db.query(User).filter(User.email == data.email).first()
+    
+    # Don't reveal if email exists or not for security
+    # Still generate and store a token even if user doesn't exist to prevent timing attacks
+    reset_token = generate_reset_token()
+    
+    if user:
+        # Expire any existing unused tokens for this user
+        existing_tokens = db.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.is_used == False,
+            PasswordResetToken.expires_at > datetime.now()
+        ).all()
+        
+        for token in existing_tokens:
+            token.is_used = True
+        
+        # Create token with 20-minute expiration
+        token_expiry = datetime.now() + timedelta(minutes=20)
+        new_token = PasswordResetToken(
+            user_id=user.id,
+            email=data.email,
+            token=reset_token,
+            expires_at=token_expiry
+        )
+        
+        db.add(new_token)
+        db.commit()
+        
+        # Send email with token
+        send_password_reset_email(data.email, reset_token)
+    
+    # Always return the same message for security (don't indicate if email exists)
+    return {"message": "If an account with this email exists, a password reset link has been sent."}
+
+@app.post("/reset-password", response_model=MessageResponse)
+def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password using the token sent via email"""
+    # Validate the password
+    is_valid, error_message = validate_password(data.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
+    
+    # Find the token
+    token_record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.email == data.email,
+        PasswordResetToken.token == data.token,
+        PasswordResetToken.is_used == False,
+        PasswordResetToken.expires_at > datetime.now()
+    ).first()
+    
+    if not token_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    # Find the user associated with this token
+    user = db.query(User).filter(User.id == token_record.user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found")
+    
+    # Hash the new password
+    hashed_password = hash_password(data.new_password, db)
+    
+    # Update user's password
+    user.password = hashed_password
+    
+    # Mark token as used
+    token_record.is_used = True
+    
+    # Add the new password to history
+    add_password_to_history(user.id, hashed_password, db)
+    
+    db.commit()
+    
+    return {"message": "Password has been reset successfully"}
+
 @app.post("/change-password", response_model=MessageResponse)
 def change_password(data: ChangePasswordData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Validate old password exists
@@ -273,6 +372,30 @@ def change_password(data: ChangePasswordData, current_user: User = Depends(get_c
     add_password_to_history(current_user.id, new_hashed_password, db)
     
     return {"message": "Password changed successfully"}
+
+@app.post("/verify-reset-token", response_model=MessageResponse)
+def verify_reset_token(data: VerifyTokenRequest, db: Session = Depends(get_db)):
+    """Verify a password reset token before allowing password change"""
+    # Find the token
+    token_record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.email == data.email,
+        PasswordResetToken.token == data.token,
+        PasswordResetToken.is_used == False,
+        PasswordResetToken.expires_at > datetime.now()
+    ).first()
+    
+    if not token_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    
+    # Find the user associated with this token
+    user = db.query(User).filter(User.id == token_record.user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found")
+    
+    # Do not mark token as used yet - it will be marked when password is reset
+    
+    return {"message": "Verification code is valid. Please set a new password."}
+
 
 # Customer endpoints (protected by authentication)
 @app.post("/customers", response_model=MessageResponse)
