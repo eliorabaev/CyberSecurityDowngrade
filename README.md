@@ -54,13 +54,17 @@ This comprehensive system provides a secure and user-friendly interface for mana
 │  React Frontend │◄────►│  FastAPI Backend │◄────►│  MySQL Database  │
 │                 │      │                  │      │                  │
 └─────────────────┘      └──────────────────┘      └──────────────────┘
-       ▲                         ▲
-       │                         │
-       │                         │
-       │     ┌──────────────┐    │
-       └────►│    JWT Auth  │◄───┘
-             │              │
-             └──────────────┘
+       ▲                         ▲                        ▲
+       │                         │                        │
+       │                         │                        │
+       │     ┌──────────────┐    │                        │
+       └────►│    JWT Auth  │◄───┘                        │
+             │              │                             │
+             └──────────────┘                             │
+                                    ┌──────────────────┐  │
+                                    │   Secure Salt &  │◄─┘
+                                    │   JWT Secrets    │
+                                    └──────────────────┘
 ```
 
 ## Detailed Project Structure
@@ -209,18 +213,23 @@ The system employs a secure password hashing implementation:
 #### JWT Authentication
 The system implements secure JWT (JSON Web Token) authentication:
 
-1. **Token Generation**:
-   - RS256 (RSA Signature with SHA-256) algorithm
+1. **JWT Secret Key Management**:
+   - The system generates and stores a secure random JWT secret key in the database
+   - This approach provides consistent authentication across multiple application instances
+   - The environment variable JWT_SECRET_KEY is used as a fallback option only
+   - Secret key is securely stored in the database `secrets` table with ID "jwt_secret"
+
+2. **Token Generation**:
+   - HS256 (HMAC with SHA-256) algorithm for signing tokens
    - 1-hour expiration time to limit attack window
    - Username stored as subject claim
-   - Secure secret key generated with `openssl rand -hex 32`
 
-2. **Token Validation**:
+3. **Token Validation**:
    - Full signature validation
    - Expiration time checking
    - Token extraction from Authorization header
 
-3. **Frontend Token Management**:
+4. **Frontend Token Management**:
    - Secure storage in localStorage
    - Automatic inclusion in API request headers
    - Session termination on logout
@@ -261,10 +270,71 @@ The system protects against XSS and injection attacks:
 
 ## Prerequisites
 
-- Docker and Docker Compose v1.29+
-- Git
-- Node.js v14+ and npm v6+ (for frontend development)
-- Modern web browser (Chrome, Firefox, Safari, Edge)
+Before setting up the application, ensure you have the following tools installed on your system:
+
+### Docker and Docker Compose (v1.29+)
+
+Docker is used to containerize the application and its dependencies.
+
+**Installation:**
+1. Download and install Docker Desktop from the [official Docker website](https://www.docker.com/products/docker-desktop)
+2. Docker Desktop includes both Docker Engine and Docker Compose
+3. After installation, verify with:
+   ```bash
+   docker --version
+   docker-compose --version
+   ```
+
+### Git
+
+Git is needed to clone the repository and manage version control.
+
+**Installation:**
+- **Windows**: Download and install from [Git for Windows](https://gitforwindows.org/)
+- **macOS**: 
+  - Using Homebrew: `brew install git`
+  - Or download from [Git website](https://git-scm.com/download/mac)
+- **Linux**: 
+  - Debian/Ubuntu: `sudo apt-get update && sudo apt-get install git`
+  - Fedora: `sudo dnf install git`
+
+Verify installation with:
+```bash
+git --version
+```
+
+### Node.js (v14+) and npm (v6+)
+
+Required for frontend development and building the React application.
+
+**Installation:**
+- **Option 1**: Download the LTS version from [Node.js official website](https://nodejs.org/)
+- **Option 2**: Use a version manager (recommended for developers):
+  - For Windows: Use [nvm-windows](https://github.com/coreybutler/nvm-windows)
+  - For macOS/Linux: Use [nvm](https://github.com/nvm-sh/nvm)
+    ```bash
+    # Install nvm
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+    
+    # Install Node.js
+    nvm install --lts
+    ```
+
+Verify installation with:
+```bash
+node --version
+npm --version
+```
+
+### Modern Web Browser
+
+For accessing and testing the application frontend.
+
+**Recommended browsers:**
+- [Google Chrome](https://www.google.com/chrome/) (Latest version)
+- [Mozilla Firefox](https://www.mozilla.org/firefox/new/) (Latest version)
+- [Microsoft Edge](https://www.microsoft.com/edge) (Latest version)
+- [Safari](https://www.apple.com/safari/) (for macOS users, latest version)
 
 ## Comprehensive Setup Guide
 
@@ -303,10 +373,6 @@ FRONTEND_URL=http://localhost:3000
 
 # Always use MySQL - future support for other databases planned
 USE_MYSQL=true
-
-# JWT Authentication
-# Generate a secure secret key with: openssl rand -hex 32
-JWT_SECRET_KEY=your_generated_jwt_secret_key
 ```
 
 > **Security Note**: For production environments, use a password manager or secure secret generator to create unique, high-entropy passwords and keys.
@@ -379,7 +445,7 @@ The system creates a default admin user on first startup:
 - Username: `admin`
 - Password: `admin`
 
-**⚠️ Important Security Action**: Change the default admin password immediately after first login using the Change Password feature.
+**⚠️ CRITICAL SECURITY ACTION**: Change the default admin password immediately after first login using the Change Password feature. This default password is intended for initial setup only and poses a significant security risk if not changed.
 
 ## Authentication Process Flow
 
@@ -402,8 +468,8 @@ The system implements a secure JWT-based authentication flow:
    - Failed attempts are recorded with IP address
    - If failure limit is reached, account is locked for 30 minutes
    - On success, failed attempt counter is reset
-   - Server creates signed JWT with 1-hour expiration
-   - Token is returned to client
+   - Server creates signed JWT with the database-stored secret key
+   - Token is returned to client with 1-hour expiration
    - Client stores token in localStorage
 
 3. **Authenticated Requests**:
