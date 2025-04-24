@@ -55,3 +55,15 @@ class AccountStatus(Base):
     is_locked = Column(Boolean, default=False)
     locked_until = Column(DateTime, nullable=True)
     failed_attempts = Column(Integer, default=0)
+
+# Password reset token model
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    email = Column(String(100), nullable=False)
+    token = Column(String(64), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.now)
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False)
