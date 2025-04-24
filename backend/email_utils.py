@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Email settings (to be added to .env)
+# Email settings from environment variables
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_USER = os.getenv("EMAIL_USER", "")
@@ -32,25 +32,25 @@ def generate_reset_token():
 
 def send_password_reset_email(email, token):
     """
-    Send password reset email with token
+    Send password reset email with verification code
     
     Args:
         email (str): User's email address
-        token (str): Reset token
+        token (str): Reset token/verification code
         
     Returns:
         bool: True if email sent successfully, False otherwise
     """
     # Check if email settings are configured
     if not EMAIL_USER or not EMAIL_PASSWORD:
-        # For development/demo, print the reset link to console
-        print(f"[DEV MODE] Password reset token for {email}: {token}")
+        # For development/demo, print the verification code to console
+        print(f"[DEV MODE] Password reset verification code for {email}: {token}")
         return True
     
     try:
         # Create message
         message = MIMEMultipart("alternative")
-        message["Subject"] = "Password Reset Request"
+        message["Subject"] = "Password Reset Verification Code"
         message["From"] = EMAIL_FROM
         message["To"] = email
         
@@ -58,11 +58,15 @@ def send_password_reset_email(email, token):
         text = f"""
         Hello,
         
-        We received a request to reset your password. Please use the following code:
+        We received a request to reset your password. Please use the following verification code:
         
         {token}
         
-        This code is valid for 20 minutes.
+        This verification code is valid for 20 minutes.
+        
+        You'll need to:
+        1. Enter this verification code
+        2. Create a new password after verification
         
         If you did not request a password reset, please ignore this email.
         
@@ -75,9 +79,14 @@ def send_password_reset_email(email, token):
         <html>
           <body>
             <p>Hello,</p>
-            <p>We received a request to reset your password. Please use the following code:</p>
-            <p style="font-size: 18px; font-weight: bold; padding: 10px; background-color: #f5f5f5; border-radius: 5px;">{token}</p>
-            <p>This code is valid for 20 minutes.</p>
+            <p>We received a request to reset your password. Please use the following verification code:</p>
+            <p style="font-size: 18px; font-weight: bold; padding: 10px; background-color: #f5f5f5; border-radius: 5px; text-align: center;">{token}</p>
+            <p>This verification code is valid for 20 minutes.</p>
+            <p>You'll need to:</p>
+            <ol>
+              <li>Enter this verification code</li>
+              <li>Create a new password after verification</li>
+            </ol>
             <p>If you did not request a password reset, please ignore this email.</p>
             <p>Regards,<br>The Internet Service Provider Team</p>
           </body>

@@ -169,6 +169,10 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
 
+class VerifyTokenRequest(BaseModel):
+    email: str
+    token: str
+
 # User endpoints
 @app.post("/login", response_model=TokenResponse)
 def login(data: LoginData, request: Request, db: Session = Depends(get_db)):
@@ -368,6 +372,30 @@ def change_password(data: ChangePasswordData, current_user: User = Depends(get_c
     add_password_to_history(current_user.id, new_hashed_password, db)
     
     return {"message": "Password changed successfully"}
+
+@app.post("/verify-reset-token", response_model=MessageResponse)
+def verify_reset_token(data: VerifyTokenRequest, db: Session = Depends(get_db)):
+    """Verify a password reset token before allowing password change"""
+    # Find the token
+    token_record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.email == data.email,
+        PasswordResetToken.token == data.token,
+        PasswordResetToken.is_used == False,
+        PasswordResetToken.expires_at > datetime.now()
+    ).first()
+    
+    if not token_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code")
+    
+    # Find the user associated with this token
+    user = db.query(User).filter(User.id == token_record.user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found")
+    
+    # Do not mark token as used yet - it will be marked when password is reset
+    
+    return {"message": "Verification code is valid. Please set a new password."}
+
 
 # Customer endpoints (protected by authentication)
 @app.post("/customers", response_model=MessageResponse)
