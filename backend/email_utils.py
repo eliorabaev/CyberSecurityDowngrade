@@ -1,20 +1,16 @@
 import os
 import hashlib
 import time
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Email settings from environment variables
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_USER = os.getenv("EMAIL_USER", "")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
+# Web3Forms API key from environment variables
+WEB3FORMS_API_KEY = os.getenv("WEB3FORMS_API_KEY", "")
 EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@example.com")
+EMAIL_TO = os.getenv("EMAIL_TO", "")  # Optional: Default recipient for Web3Forms if not using dashboard default
 
 def generate_reset_token():
     """
@@ -32,7 +28,7 @@ def generate_reset_token():
 
 def send_password_reset_email(email, token):
     """
-    Send password reset email with verification code
+    Send password reset email with verification code using Web3Forms
     
     Args:
         email (str): User's email address
@@ -41,71 +37,124 @@ def send_password_reset_email(email, token):
     Returns:
         bool: True if email sent successfully, False otherwise
     """
-    # Check if email settings are configured
-    if not EMAIL_USER or not EMAIL_PASSWORD:
+    # Check if Web3Forms API key is configured
+    if not WEB3FORMS_API_KEY:
         # For development/demo, print the verification code to console
         print(f"[DEV MODE] Password reset verification code for {email}: {token}")
         return True
     
     try:
-        # Create message
-        message = MIMEMultipart("alternative")
-        message["Subject"] = "Password Reset Verification Code"
-        message["From"] = EMAIL_FROM
-        message["To"] = email
+        # Web3Forms API endpoint
+        url = "https://api.web3forms.com/submit"
         
-        # Create the plain text version of the message
-        text = f"""
+        # Create plain text content
+        message_content = f"""
         Hello,
-        
+
         We received a request to reset your password. Please use the following verification code:
-        
+
         {token}
-        
+
         This verification code is valid for 20 minutes.
-        
+
         You'll need to:
         1. Enter this verification code
         2. Create a new password after verification
-        
+
         If you did not request a password reset, please ignore this email.
-        
+
         Regards,
         The Internet Service Provider Team
         """
         
-        # Create the html version of the message
-        html = f"""
-        <html>
-          <body>
-            <p>Hello,</p>
-            <p>We received a request to reset your password. Please use the following verification code:</p>
-            <p style="font-size: 18px; font-weight: bold; padding: 10px; background-color: #f5f5f5; border-radius: 5px; text-align: center;">{token}</p>
-            <p>This verification code is valid for 20 minutes.</p>
-            <p>You'll need to:</p>
-            <ol>
-              <li>Enter this verification code</li>
-              <li>Create a new password after verification</li>
-            </ol>
-            <p>If you did not request a password reset, please ignore this email.</p>
-            <p>Regards,<br>The Internet Service Provider Team</p>
-          </body>
-        </html>
-        """
+        # Prepare data for Web3Forms
+        data = {
+            "access_key": WEB3FORMS_API_KEY,
+            "subject": "Password Reset Verification Code",
+            "from_name": "Internet Service Provider",
+            "from_email": EMAIL_FROM,
+            "reply_to": EMAIL_FROM,
+            "to_email": email,
+            "message": message_content,
+            "json": "true"
+        }
         
-        # Attach parts
-        part1 = MIMEText(text, "plain")
-        part2 = MIMEText(html, "html")
-        message.attach(part1)
-        message.attach(part2)
+        # Send the request to Web3Forms API
+        response = requests.post(url, data=data)
         
-        # Send email
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_FROM, email, message.as_string())
+        # Check if the request was successful
+        if response.status_code == 200:
+            try:
+                result = response.json()
+                if result.get("success"):
+                    return True
+                else:
+                    print(f"Web3Forms API error: {result.get('message', 'Unknown error')}")
+                    return False
+            except ValueError:
+                # HTML response - common with Web3Forms
+                return "submitted successfully" in response.text or "success" in response.text.lower()
+        else:
+            print(f"Failed to send email: HTTP {response.status_code}")
+            return False
             
-        return True
     except Exception as e:
         print(f"Failed to send email: {e}")
+        return False
+
+def send_contact_form_email(name, email, subject, message, to_email=None):
+    """
+    Send contact form submissions using Web3Forms
+    
+    Args:
+        name (str): Sender's name
+        email (str): Sender's email
+        subject (str): Email subject
+        message (str): Message content
+        to_email (str, optional): Override recipient email
+        
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    """
+    if not WEB3FORMS_API_KEY:
+        print(f"[DEV MODE] Contact form submission from {name} <{email}>: {subject}")
+        return True
+    
+    try:
+        # Web3Forms API endpoint
+        url = "https://api.web3forms.com/submit"
+        
+        # Prepare the data payload
+        data = {
+            "access_key": WEB3FORMS_API_KEY,
+            "subject": f"Contact Form: {subject}",
+            "name": name,
+            "email": email,
+            "message": message,
+            "json": "true"
+        }
+        
+        # Add recipient email if specified
+        if to_email:
+            data["to_email"] = to_email
+        elif EMAIL_TO:
+            data["to_email"] = EMAIL_TO
+        
+        # Send the request
+        response = requests.post(url, data=data)
+
+        # Check if the request was successful
+        if response.status_code == 200:
+            try:
+                result = response.json()
+                return result.get("success", False)
+            except ValueError:
+                # HTML response - common with Web3Forms
+                return "submitted successfully" in response.text or "success" in response.text.lower()
+        else:
+            print(f"Failed to send contact form: HTTP {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"Failed to send contact form: {e}")
         return False
