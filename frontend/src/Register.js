@@ -77,9 +77,6 @@ function Register() {
             onChange={handleUsernameChange}
             disabled={isLoading}
           />
-          <div className="requirements-text">
-            Username must be 3-20 characters using only English letters and numbers.
-          </div>
         </div>
 
         <div className="field-wrapper">
@@ -102,10 +99,6 @@ function Register() {
             onChange={handlePasswordChange}
             disabled={isLoading}
           />
-          <div className="requirements-text">
-            Password must be at least 8 characters and include uppercase, lowercase, 
-            numbers, and special characters.
-          </div>
         </div>
 
         <div className="field-wrapper">

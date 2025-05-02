@@ -196,10 +196,6 @@ function ForgotPassword() {
           onChange={(e) => setNewPassword(e.target.value)}
           disabled={isLoading}
         />
-        <div className="requirements-text">
-          Password must be at least 10 characters and include uppercase, lowercase, 
-          numbers, and special characters.
-        </div>
       </div>
 
       <button 

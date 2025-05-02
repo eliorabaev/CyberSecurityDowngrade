@@ -38,7 +38,7 @@ const config = {
       requireSpecial: true,
       specialChars: "!@#$%^&*()_-+=<>?/[]{}|",
       errorMessages: {
-        minLength: "Password must be at least 8 characters",
+        minLength: "Password must be at least 10 characters",
         maxLength: "Password cannot exceed 50 characters",
         requireUppercase: "Password must include at least one uppercase letter",
         requireLowercase: "Password must include at least one lowercase letter",
