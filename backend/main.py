@@ -311,11 +311,6 @@ def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
 @app.post("/reset-password", response_model=MessageResponse)
 def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     """Reset password using the token sent via email"""
-    # Validate the password
-    is_valid, error_message = validate_password(data.new_password)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
-    
     # Find the token
     token_record = db.query(PasswordResetToken).filter(
         PasswordResetToken.email == data.email,
@@ -331,6 +326,11 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == token_record.user_id).first()
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
+    
+    # Validate the new password, including history check
+    is_valid, error_message = validate_password(data.new_password, user.id, db)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_message)
     
     # Hash the new password
     hashed_password = hash_password(data.new_password, db)
