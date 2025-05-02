@@ -4,6 +4,16 @@ A secure web application for managing internet service customers with a FastAPI 
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-1.2.0-green.svg)
+![Python](https://img.shields.io/badge/python-3.9-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.68+-teal.svg)
+![React](https://img.shields.io/badge/react-19.0.0-61DAFB.svg?logo=react&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg?logo=mysql&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg?logo=docker&logoColor=white)
+![Security](https://img.shields.io/badge/security-enhanced-brightgreen.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTEyIDEyaDdjLS41IDQuMS0zLjMgNy44LTcgOXYtOXptLTEgOUM3LjMgMTkuOCA0LjUgMTYuMSA0IDEyaDd2OXptLTctOWMuNS00LjEgMy4zLTcuOCA3LTlWM2g2djFjMy43IDEuMiA2LjUgNC45IDcgOUgxOGgtMkg0eiIvPjwvc3ZnPg==)
+![Maintenance](https://img.shields.io/badge/maintained-yes-brightgreen.svg)
+![PBKDF2](https://img.shields.io/badge/PBKDF2-1,200,000%20iterations-red.svg)
+![JWT](https://img.shields.io/badge/JWT-authentication-yellow.svg)
+![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 ## Table of Contents
 - [Overview](#overview)
@@ -54,7 +64,9 @@ This comprehensive system provides a secure and user-friendly interface for mana
   - Password hashing with PBKDF2-HMAC-SHA256 (1,200,000 iterations)
   - Database-stored cryptographic salt for consistent security
   - Protection against brute force and replay attacks
+  - Multi-level account security with both username and IP-based lockouts
   - Account lockout after 3 failed login attempts
+  - IP address lockout after 10 failed login attempts
   - Prevention of password reuse (last 3 passwords)
   - Dictionary-based password blacklist
   - Secure password reset flow with time-limited verification
@@ -204,23 +216,37 @@ The system now enforces a robust password policy:
    - Prevents reuse of the last 3 passwords
    - Stores securely hashed password history
    - Enforces during password change operations
+   - Applied to both password change and password reset flows
 
 2. **Dictionary Password Prevention**:
    - Maintains a comprehensive list of common passwords
    - Prevents use of easily guessable passwords
    - Case-insensitive matching for better protection
 
-3. **Brute Force Protection**:
-   - Account lockout after 3 failed login attempts
-   - 30-minute lockout duration
-   - IP address tracking for security forensics
-   - User-friendly notifications about account status
+3. **Multi-Layered Brute Force Protection**:
+   - **User Account Protection**:
+     - Account lockout after 3 failed login attempts
+     - 30-minute lockout duration
+     - Protection against targeted account attacks
+   
+   - **IP-Based Protection**:
+     - IP address lockout after 10 failed login attempts
+     - Sliding 24-hour window for tracking attempts
+     - 60-minute lockout duration
+     - Protection against distributed brute force attacks
+     - Prevents attackers from targeting multiple accounts
+   
+   - **Comprehensive Tracking**:
+     - IP address logging for all login attempts
+     - Records both successful and unsuccessful attempts
+     - Enables security forensics and pattern detection
 
 4. **Secure Password Reset**:
    - Three-step verification process (email → token → password)
    - Time-limited verification codes (20-minute expiration)
    - Single-use verification tokens
    - Separation of verification and password reset steps
+   - Password history validation during reset
 
 #### Centralized Security Configuration
 The system uses a modular approach to security settings:
@@ -228,12 +254,13 @@ The system uses a modular approach to security settings:
 1. **Configurable Security Parameters**:
    - Password complexity requirements in `password_config.py`
    - Password history depth setting
-   - Failed login attempt thresholds
-   - Account lockout duration
+   - Failed login attempt thresholds (both user and IP-based)
+   - Account lockout duration settings
+   - IP lockout duration settings
 
 2. **Database Structure for Security**:
    - Password history tracking tables
-   - Login attempt monitoring tables
+   - Login attempt monitoring tables with IP tracking
    - Account status tracking tables
    - Password reset token tables
 
@@ -300,9 +327,32 @@ The system implements a secure three-step password reset flow:
 
 3. **Password Reset (Step 3)**:
    - User submits new password with verified token
-   - Password is validated against security policy
+   - Password is validated against security policy and password history
+   - System ensures new password differs from previous passwords
    - Token is marked as used after successful reset
    - User receives confirmation of successful reset
+
+#### Brute Force Defense
+The system implements a multilayered approach to defend against brute force attacks:
+
+1. **Per-User Account Protection**:
+   - Tracks failed login attempts per username
+   - Implements account lockout after threshold is reached
+   - Prevents targeted attacks against specific accounts
+   - Uses the `AccountStatus` table to track lockout status
+
+2. **IP-Based Protection**:
+   - Tracks failed login attempts by IP address
+   - Implements IP lockout after threshold is reached
+   - Uses a sliding window approach (24-hour period)
+   - Prevents distributed attacks across multiple accounts
+   - Uses the `LoginAttempt` table for IP tracking
+
+3. **Progressive Security Logic**:
+   - First checks IP-based restrictions
+   - Then checks user-based restrictions
+   - Ensures complete protection against various attack patterns
+   - Records all attempts with timestamps for analysis
 
 ### Data Security
 
@@ -543,12 +593,14 @@ The system implements a secure JWT-based authentication flow:
 2. **User Login**:
    - Client provides basic validation on the login form
    - Client submits username and password
-   - Server checks for previous failed attempts
+   - Server first checks if the client's IP is temporarily locked
+   - If IP is not locked, server checks for previous failed attempts for the username
    - If account is locked, login is denied with appropriate message
    - If not locked, server validates credentials
    - Failed attempts are recorded with IP address
-   - If failure limit is reached, account is locked for 30 minutes
-   - On success, failed attempt counter is reset
+   - If user failure limit is reached, account is locked for 30 minutes
+   - If IP failure limit is reached, IP is locked for 60 minutes
+   - On success, failed attempt counters are reset
    - Server creates signed JWT with the database-stored secret key
    - Token is returned to client with 1-hour expiration
    - Client stores token in localStorage
@@ -567,6 +619,7 @@ The system implements a secure JWT-based authentication flow:
    - In production mode, code is sent via Web3Forms email service
    - User enters verification code for validation
    - After successful validation, user sets new password
+   - New password is checked against password history and blacklist
    - Token is invalidated after successful password reset
 
 5. **Password Change**:
@@ -623,7 +676,7 @@ Authenticates a user and provides a JWT token.
 - `400 Bad Request`: Missing username or password
 - `401 Unauthorized`: Invalid credentials
 - `423 Locked`: Account is temporarily locked
-- `429 Too Many Requests`: Too many failed login attempts
+- `429 Too Many Requests`: Too many failed login attempts (either user-based or IP-based)
 
 #### `POST /register`
 Creates a new user account.
@@ -705,7 +758,7 @@ Resets the password using a verified token.
 ```
 
 **Error Responses:**
-- `400 Bad Request`: Invalid token or password validation failure
+- `400 Bad Request`: Invalid token, password validation failure, or password in history
 
 #### `GET /me`
 Retrieves information about the authenticated user.
