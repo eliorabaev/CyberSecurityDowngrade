@@ -53,14 +53,14 @@ This comprehensive system provides a secure and user-friendly interface for mana
 ```
 ┌─────────────────┐      ┌──────────────────┐      ┌──────────────────┐
 │                 │      │                  │      │                  │
-│  React Frontend │◄────►│  FastAPI Backend │◄────►│  MySQL Database  │
+│ React Frontend  │◄────►│ FastAPI Backend  │◄────►│  MySQL Database  │
 │                 │      │                  │      │                  │
 └─────────────────┘      └──────────────────┘      └──────────────────┘
        ▲                         ▲                        ▲
        │                         │                        │
        │                         │                        │
        │     ┌──────────────┐    │                        │
-       └────►│    JWT Auth  │◄───┘                        │
+       └────►│   JWT Auth   │◄───┘                        │
              │              │                             │
              └──────────────┘                             │
                                     ┌──────────────────┐  │
@@ -252,7 +252,7 @@ The system implements a secure three-step password reset flow:
    - System generates a secure SHA-1 verification code
    - Code is stored with a 20-minute expiration time
    - In development mode, code is displayed in console
-   - In production mode, code is sent via email
+   - In production mode, code is sent via Web3Forms email service
 
 2. **Code Verification (Step 2)**:
    - User submits verification code
@@ -406,13 +406,16 @@ FRONTEND_URL=http://localhost:3000
 # Always use MySQL - future support for other databases planned
 USE_MYSQL=true
 
-# Email Settings for password reset (minimum required for DEV mode)
+# Email Settings for password reset
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_FROM=noreply@yourcompany.com
-# For production, add these settings:
-# EMAIL_USER=your_email@gmail.com
-# EMAIL_PASSWORD=your_app_password
+
+# Web3Forms API Key
+# Replace with your actual Web3Forms API key
+# The verification key for password reset will be sent to the mail associated with the API key
+# You can get your API key from https://web3forms.com/dashboard
+WEB3FORMS_API_KEY=enter_your_api_key_here
 ```
 
 > **Security Note**: For production environments, use a password manager or secure secret generator to create unique, high-entropy passwords and keys.
@@ -523,7 +526,7 @@ The system implements a secure JWT-based authentication flow:
    - User requests password reset by entering email
    - System generates verification code with 20-minute expiration
    - In development mode, code appears in server console
-   - In production mode, code is sent via email
+   - In production mode, code is sent via Web3Forms email service
    - User enters verification code for validation
    - After successful validation, user sets new password
    - Token is invalidated after successful password reset
@@ -553,7 +556,7 @@ For development testing of the password reset functionality:
 3. Enter this code in the verification step
 4. Create a new password after verification
 
-For production use, configure `EMAIL_USER` and `EMAIL_PASSWORD` in your `.env` file to send actual emails with verification codes.
+For production use, configure `WEB3FORMS_API_KEY` in your `.env` file. The verification code will be sent to the email address associated with your Web3Forms API key. You can get your API key from https://web3forms.com/dashboard.
 
 ## Detailed API Documentation
 
