@@ -30,7 +30,8 @@ from security_utils import (
     is_account_locked, 
     increment_failed_attempts, 
     reset_failed_attempts,
-    add_password_to_history
+    add_password_to_history,
+    is_ip_locked
 )
 
 from sqlalchemy.orm import Session
@@ -181,6 +182,13 @@ def login(data: LoginData, request: Request, db: Session = Depends(get_db)):
 
     # Get user's IP address for logging
     client_ip = request.client.host if request.client else "unknown"
+    
+    # FIRST: Check if IP is locked due to too many failed attempts
+    is_locked_ip, lock_message_ip = is_ip_locked(client_ip, db)
+    if is_locked_ip:
+        # Record the attempt
+        record_login_attempt(data.username, False, client_ip, db)
+        raise HTTPException(status_code=429, detail=lock_message_ip)
     
     # Check if username exists
     user = db.query(User).filter(User.username == data.username).first()

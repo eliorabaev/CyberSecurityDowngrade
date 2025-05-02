@@ -29,6 +29,12 @@ PASSWORD_HISTORY_LENGTH = 3
 # Maximum number of failed login attempts before account is locked
 MAX_LOGIN_ATTEMPTS = 3
 
+# Maximum number of failed login attempts per IP before it's blocked
+MAX_IP_LOGIN_ATTEMPTS = 10
+
+# Minutes to lock an IP after too many failed attempts
+IP_LOCKOUT_MINUTES = 60
+
 # List of common passwords that are not allowed (dictionary passwords)
 DISALLOWED_PASSWORDS = [
     "password",

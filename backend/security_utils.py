@@ -212,3 +212,65 @@ def reset_failed_attempts(user_id: int, db: Session):
     if status:
         status.failed_attempts = 0
         db.commit()
+
+def get_recent_ip_failed_attempts(ip_address: str, db: Session) -> int:
+    """
+    Get the number of recent failed login attempts from an IP address
+    
+    Args:
+        ip_address (str): The IP address to check
+        db (Session): SQLAlchemy database session
+        
+    Returns:
+        int: Number of recent failed attempts
+    """
+    # Only count attempts in the last 24 hours
+    cutoff_time = datetime.now() - timedelta(hours=24)
+    
+    # Query for failed attempts from this IP
+    attempts = db.query(LoginAttempt)\
+        .filter(
+            LoginAttempt.ip_address == ip_address,
+            LoginAttempt.successful == False,
+            LoginAttempt.attempt_time >= cutoff_time
+        )\
+        .count()
+    
+    return attempts
+
+def is_ip_locked(ip_address: str, db: Session) -> tuple:
+    """
+    Check if an IP address is temporarily blocked due to too many failed attempts
+    
+    Args:
+        ip_address (str): The IP address to check
+        db (Session): SQLAlchemy database session
+        
+    Returns:
+        tuple: (is_locked, lock_message)
+    """
+    # Get recent failed attempts
+    recent_attempts = get_recent_ip_failed_attempts(ip_address, db)
+    
+    # Check if IP should be locked
+    if recent_attempts >= config.MAX_IP_LOGIN_ATTEMPTS:
+        # Calculate when the oldest of those attempts would expire
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        oldest_attempt = db.query(LoginAttempt)\
+            .filter(
+                LoginAttempt.ip_address == ip_address,
+                LoginAttempt.successful == False,
+                LoginAttempt.attempt_time >= cutoff_time
+            )\
+            .order_by(LoginAttempt.attempt_time.asc())\
+            .first()
+            
+        if oldest_attempt:
+            # Calculate remaining lockout time
+            lock_expires = oldest_attempt.attempt_time + timedelta(minutes=config.IP_LOCKOUT_MINUTES)
+            if lock_expires > datetime.now():
+                remaining_time = lock_expires - datetime.now()
+                minutes = max(1, int(remaining_time.total_seconds() / 60))
+                return True, f"Too many login attempts from this IP. Try again in {minutes} minutes."
+    
+    return False, ""
