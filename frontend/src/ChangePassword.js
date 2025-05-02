@@ -81,10 +81,6 @@ function ChangePassword() {
             onChange={handleNewPasswordChange}
             disabled={isLoading}
           />
-          <div className="requirements-text">
-            Password must be at least 8 characters and include uppercase, lowercase, 
-            numbers, and special characters.
-          </div>
         </div>
 
 
