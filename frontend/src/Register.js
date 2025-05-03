@@ -101,17 +101,6 @@ function Register() {
           />
         </div>
 
-        <div className="field-wrapper">
-          <input
-            type="password"
-            className="input-field"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={handleConfirmPasswordChange}
-            disabled={isLoading}
-          />
-        </div>
-
         <button 
           className="connect-button" 
           onClick={handleRegister}
