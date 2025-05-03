@@ -92,17 +92,3 @@ export const validateCustomerName = (name) => {
   
   return { isValid: true, errorMessage: '' };
 };
-
-/**
- * Validates that passwords match for password confirmation
- * @param {string} password - The original password
- * @param {string} confirmPassword - The confirmation password
- * @returns {Object} - { isValid: boolean, errorMessage: string }
- */
-export const validatePasswordMatch = (password, confirmPassword) => {
-  if (password !== confirmPassword) {
-    return { isValid: false, errorMessage: "Passwords do not match" };
-  }
-  
-  return { isValid: true, errorMessage: '' };
-};
