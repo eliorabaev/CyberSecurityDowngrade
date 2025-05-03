@@ -5,7 +5,6 @@ function Register() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,10 +18,6 @@ function Register() {
 
   const handlePasswordChange = (e) => {
     setPassword(e.target.value);
-  };
-
-  const handleConfirmPasswordChange = (e) => {
-    setConfirmPassword(e.target.value);
   };
 
   const handleRegister = async () => {
@@ -44,7 +39,6 @@ function Register() {
         setUsername("");
         setEmail("");
         setPassword("");
-        setConfirmPassword("");
         
         // Redirect to login page after 2 seconds
         setTimeout(() => {
@@ -97,17 +91,6 @@ function Register() {
             placeholder="Password"
             value={password}
             onChange={handlePasswordChange}
-            disabled={isLoading}
-          />
-        </div>
-
-        <div className="field-wrapper">
-          <input
-            type="password"
-            className="input-field"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={handleConfirmPasswordChange}
             disabled={isLoading}
           />
         </div>
