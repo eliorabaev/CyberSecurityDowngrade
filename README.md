@@ -1,6 +1,6 @@
-# Internet Service Provider Management System
+# Internet Service Provider Management System (VULNERABILITY DEMONSTRATION VERSION)
 
-A secure web application for managing internet service customers with a FastAPI backend and React frontend, featuring robust user authentication and session management.
+A web application for managing internet service customers with a FastAPI backend and React frontend, **deliberately containing security vulnerabilities for educational purposes**.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Version](https://img.shields.io/badge/version-1.2.0-green.svg)
@@ -9,11 +9,29 @@ A secure web application for managing internet service customers with a FastAPI 
 ![React](https://img.shields.io/badge/react-19.0.0-61DAFB.svg?logo=react&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg?logo=mysql&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg?logo=docker&logoColor=white)
-![Security](https://img.shields.io/badge/security-enhanced-brightgreen.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTEyIDEyaDdjLS41IDQuMS0zLjMgNy44LTcgOXYtOXptLTEgOUM3LjMgMTkuOCA0LjUgMTYuMSA0IDEyaDd2OXptLTctOWMuNS00LjEgMy4zLTcuOCA3LTlWM2g2djFjMy43IDEuMiA2LjUgNC45IDcgOUgxOGgtMkg0eiIvPjwvc3ZnPg==)
+![Security](https://img.shields.io/badge/security-VULNERABLE-red.svg)
 ![Maintenance](https://img.shields.io/badge/maintained-yes-brightgreen.svg)
 ![PBKDF2](https://img.shields.io/badge/PBKDF2-1,200,000%20iterations-red.svg)
 ![JWT](https://img.shields.io/badge/JWT-authentication-yellow.svg)
 ![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+
+## ⚠️ IMPORTANT SECURITY NOTICE ⚠️
+
+**This application intentionally contains security vulnerabilities for educational and demonstration purposes.**
+
+The following security vulnerabilities have been deliberately introduced:
+
+1. **Cross-Site Scripting (XSS)**: The customer management endpoints do not perform HTML escaping or sanitization, making the application vulnerable to XSS attacks.
+
+2. **SQL Injection**: The application has been modified to remove SQL safety measures, allowing SQL injection attacks.
+
+**DO NOT USE THIS APPLICATION IN PRODUCTION ENVIRONMENTS OR WITH REAL DATA.**
+
+This version is intended solely for:
+- Educational demonstrations
+- Security training workshops
+- Vulnerability testing practice
+- Understanding the impact of common web vulnerabilities
 
 ## Table of Contents
 - [Overview](#overview)
@@ -31,6 +49,9 @@ A secure web application for managing internet service customers with a FastAPI 
 - [Detailed Security Implementation](#detailed-security-implementation)
   - [Authentication Security](#authentication-security)
   - [Data Security](#data-security)
+- [Deliberate Security Vulnerabilities](#deliberate-security-vulnerabilities)
+  - [XSS Vulnerability](#xss-vulnerability)
+  - [SQL Injection Vulnerability](#sql-injection-vulnerability)
 - [Prerequisites](#prerequisites)
 - [Comprehensive Setup Guide](#comprehensive-setup-guide)
   - [Clone the repository](#1-clone-the-repository)
@@ -55,7 +76,7 @@ A secure web application for managing internet service customers with a FastAPI 
 
 ## Overview
 
-This comprehensive system provides a secure and user-friendly interface for managing Internet Service Provider (ISP) customers. Built with security best practices at every level, it implements a layered defense approach to protect sensitive customer data while maintaining a smooth user experience.
+This system provides a user-friendly interface for managing Internet Service Provider (ISP) customers. This version has been intentionally modified to include security vulnerabilities for educational and demonstration purposes.
 
 ## Key Features
 
@@ -81,16 +102,9 @@ This comprehensive system provides a secure and user-friendly interface for mana
 
 - 👥 **Customer Management**
   - Add new customers with validated information
-  - View customers with secure data presentation
-  - Input validation to prevent malicious data entry
-  - Protection against XSS through automatic HTML escaping
-
-- 🔒 **Full-Stack Security Implementation**
-  - Robust server-side validation using Pydantic models
-  - Login page frontend validation for user experience
-  - Content Security Policy implementation
-  - Automatic input sanitization and output escaping
-  - Enhanced brute force protection mechanisms
+  - View customers with data presentation
+  - ⚠️ **Vulnerable to XSS attacks** - HTML is not escaped
+  - ⚠️ **Vulnerable to SQL injection** - No SQL sanitization
 
 - 🌐 **Production-Ready Architecture**
   - Responsive React-based interface
@@ -135,7 +149,7 @@ This comprehensive system provides a secure and user-friendly interface for mana
 │   ├── database.py               # Database connection & configuration
 │   ├── models.py                 # SQLAlchemy database models
 │   ├── main.py                   # FastAPI application entry point
-│   │   ├── API routes            # HTTP endpoints
+│   │   ├── API routes            # HTTP endpoints (contains vulnerable code)
 │   │   ├── Authentication        # Token validation
 │   │   ├── Pydantic models       # Request/response validation
 │   │   └── Middleware            # CORS, error handling
@@ -174,7 +188,7 @@ This comprehensive system provides a secure and user-friendly interface for mana
         ├── index.css             # Global styles
         ├── utils/                # Utility functions
         ├── ChangePassword.js     # Password management component
-        ├── CustomerManagement.js # Customer CRUD operations
+        ├── CustomerManagement.js # Customer CRUD operations (contains vulnerable code)
         ├── ForgotPassword.js     # Password recovery component
         └── Register.js           # User registration component
 ```
@@ -198,7 +212,7 @@ This comprehensive system provides a secure and user-friendly interface for mana
 - **localStorage**: Client-side token storage
 
 ### Database
-- **MySQL**: Reliable relational database system
+- **MySQL**: Relational database system
 - **SQLAlchemy ORM**: Object-relational mapping for database access
 
 ### Infrastructure
@@ -210,7 +224,7 @@ This comprehensive system provides a secure and user-friendly interface for mana
 ### Advanced Authentication Protection
 
 #### Password Policy Enforcement
-The system now enforces a robust password policy:
+The system enforces a robust password policy:
 
 1. **Password History Tracking**:
    - Prevents reuse of the last 3 passwords
@@ -248,145 +262,41 @@ The system now enforces a robust password policy:
    - Separation of verification and password reset steps
    - Password history validation during reset
 
-#### Centralized Security Configuration
-The system uses a modular approach to security settings:
+## Deliberate Security Vulnerabilities
 
-1. **Configurable Security Parameters**:
-   - Password complexity requirements in `password_config.py`
-   - Password history depth setting
-   - Failed login attempt thresholds (both user and IP-based)
-   - Account lockout duration settings
-   - IP lockout duration settings
+### XSS Vulnerability
 
-2. **Database Structure for Security**:
-   - Password history tracking tables
-   - Login attempt monitoring tables with IP tracking
-   - Account status tracking tables
-   - Password reset token tables
+The Customer Management features have been deliberately modified to remove output escaping and sanitization protections, creating an XSS vulnerability:
 
-## Detailed Security Implementation
+1. **Backend Changes**:
+   - The `CustomerResponse` model no longer sanitizes fields
+   - The HTML escaping validator has been removed
+   - Customer data is returned without any sanitization
 
-### Authentication Security
+2. **Frontend Changes**:
+   - The `createSafeDisplay` function has been modified to use React's `dangerouslySetInnerHTML` attribute
+   - Customer data is rendered directly without sanitization
+   - HTML and JavaScript in customer data will be executed by the browser
 
-#### Password Hashing Process
-The system employs a secure password hashing implementation:
+3. **Vulnerability Impact**:
+   - Attackers can inject malicious JavaScript code into customer records
+   - When viewed in the customer list, this code will execute in users' browsers
+   - This can lead to cookie theft, credential harvesting, or other client-side attacks
 
-1. **Salt Generation & Storage**:
-   - A 32-byte (256-bit) cryptographically secure random salt is generated at first application startup
-   - The salt is stored in a dedicated `secrets` table in the database with ID "main"
-   - This approach ensures consistent salt usage across application instances
+### SQL Injection Vulnerability
 
-2. **Password Hashing Algorithm**:
-   - PBKDF2-HMAC-SHA256 with 1,200,000 iterations (significantly above NIST recommendations)
-   - 32-byte (256-bit) derived key length
-   - Base64 encoding for database storage
+The application has been modified to remove SQL protection measures:
 
-3. **Verification Process**:
-   - Constant-time comparison to prevent timing attacks
-   - Same salt and parameters ensure consistent verification
+1. **Backend Changes**:
+   - Direct SQL execution without parameterization
+   - Removal of SQLAlchemy's built-in protection mechanisms
+   - Customer data is directly inserted into SQL queries
 
-#### JWT Authentication
-The system implements secure JWT (JSON Web Token) authentication:
-
-1. **JWT Secret Key Management**:
-   - The system generates and stores a secure random JWT secret key in the database
-   - This approach provides consistent authentication across multiple application instances
-   - The environment variable JWT_SECRET_KEY is used as a fallback option only
-   - Secret key is securely stored in the database `secrets` table with ID "jwt_secret"
-
-2. **Token Generation**:
-   - HS256 (HMAC with SHA-256) algorithm for signing tokens
-   - 1-hour expiration time to limit attack window
-   - Username stored as subject claim
-
-3. **Token Validation**:
-   - Full signature validation
-   - Expiration time checking
-   - Token extraction from Authorization header
-
-4. **Frontend Token Management**:
-   - Secure storage in localStorage
-   - Automatic inclusion in API request headers
-   - Session termination on logout
-
-#### Password Reset Process
-The system implements a secure three-step password reset flow:
-
-1. **Email Request (Step 1)**:
-   - User submits email address
-   - System generates a secure SHA-1 verification code
-   - Code is stored with a 20-minute expiration time
-   - In development mode, code is displayed in console
-   - In production mode, code is sent via Web3Forms email service
-
-2. **Code Verification (Step 2)**:
-   - User submits verification code
-   - Backend validates code against stored token
-   - Token must be unexpired and unused
-   - Authorization to reset password granted only after verification
-
-3. **Password Reset (Step 3)**:
-   - User submits new password with verified token
-   - Password is validated against security policy and password history
-   - System ensures new password differs from previous passwords
-   - Token is marked as used after successful reset
-   - User receives confirmation of successful reset
-
-#### Brute Force Defense
-The system implements a multilayered approach to defend against brute force attacks:
-
-1. **Per-User Account Protection**:
-   - Tracks failed login attempts per username
-   - Implements account lockout after threshold is reached
-   - Prevents targeted attacks against specific accounts
-   - Uses the `AccountStatus` table to track lockout status
-
-2. **IP-Based Protection**:
-   - Tracks failed login attempts by IP address
-   - Implements IP lockout after threshold is reached
-   - Uses a sliding window approach (24-hour period)
-   - Prevents distributed attacks across multiple accounts
-   - Uses the `LoginAttempt` table for IP tracking
-
-3. **Progressive Security Logic**:
-   - First checks IP-based restrictions
-   - Then checks user-based restrictions
-   - Ensures complete protection against various attack patterns
-   - Records all attempts with timestamps for analysis
-
-### Data Security
-
-#### Input Validation
-The system implements a two-tier validation strategy:
-
-1. **Login Page Frontend Validation**:
-   - Real-time feedback on login page only
-   - Basic validation for user experience
-
-2. **Robust Server-Side Validation**:
-   - Primary validation mechanism for all endpoints
-   - Pydantic models for request body validation
-   - Type checking and constraint enforcement
-   - Detailed error messaging for debugging
-   - Protection against malformed or malicious data
-
-3. **Database Validation**:
-   - SQLAlchemy column constraints
-   - Unique constraints for username/email
-   - Foreign key constraints for data integrity
-
-#### Output Security
-The system protects against XSS and injection attacks:
-
-1. **HTML Escaping**:
-   - Automatic escaping of HTML special characters
-   - Custom `sanitize_string()` function
-   - Pydantic validators for response models
-
-2. **Safe Rendering**:
-   - React's built-in XSS protection
-   - Custom helper to handle sanitized content
-   - Type-safe rendering in components
+2. **Vulnerability Impact**:
+   - Attackers can inject SQL commands into input fields
+   - This can lead to unauthorized access to data
+   - Potential for data extraction, modification, or deletion
+   - Authentication bypass possibilities
 
 ## Prerequisites
 
@@ -461,8 +371,8 @@ For accessing and testing the application frontend.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/eliorabaev/CyberSecurity.git
-cd CyberSecurity
+git clone https://github.com/eliorabaev/CyberSecurityDowngrade.git
+cd CyberSecurityDowngrade
 ```
 
 ### 2. Backend Configuration
@@ -502,7 +412,7 @@ EMAIL_FROM=noreply@yourcompany.com
 # Web3Forms API Key
 # Replace with your actual Web3Forms API key
 # The verification key for password reset will be sent to the mail associated with the API key
-# You can get your API key from https://web3forms.com/dashboard
+# You can get your API key from https://web3forms.com/
 WEB3FORMS_API_KEY=enter_your_api_key_here
 ```
 
@@ -622,245 +532,39 @@ The system implements a secure JWT-based authentication flow:
    - New password is checked against password history and blacklist
    - Token is invalidated after successful password reset
 
-5. **Password Change**:
-   - Client submits old and new passwords with token
-   - Server validates token and old password
-   - New password is checked against password history and blacklist
-   - New password is hashed and stored
-   - Password is added to password history
-   - Success response indicates completion
+## Testing Deliberate Security Vulnerabilities
 
-6. **Logout Process**:
-   - Client removes token from localStorage
-   - No server-side action required (stateless authentication)
-   - User must re-authenticate to access protected resources
+### Testing XSS Vulnerability
 
-## Testing Password Reset (Development Mode)
+To test the XSS vulnerability:
 
-For development testing of the password reset functionality:
-
-1. Request a password reset by entering an email address
-2. Check the server console output for the verification code
+1. Log in to the application
+2. Navigate to the Customer Management section
+3. Add a new customer with a malicious script in the name field:
    ```
-   [DEV MODE] Password reset verification code for user@example.com: a1b2c3d4e5...
+   <script>alert('XSS Attack!')</script>
    ```
-3. Enter this code in the verification step
-4. Create a new password after verification
+   or
+   ```
+   <img src="x" onerror="alert('XSS Attack!')">
+   ```
+4. View the customer list to see the script execute
 
-For production use, configure `WEB3FORMS_API_KEY` in your `.env` file. The verification code will be sent to the email address associated with your Web3Forms API key. You can get your API key from https://web3forms.com/dashboard.
+### Testing SQL Injection Vulnerability 
 
-## Detailed API Documentation
+To test the SQL injection vulnerability:
 
-### Authentication Endpoints
-
-#### `POST /login`
-Authenticates a user and provides a JWT token.
-
-**Request Body:**
-```json
-{
-  "username": "string",
-  "password": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "access_token": "string",
-  "token_type": "bearer"
-}
-```
-
-**Error Responses:**
-- `400 Bad Request`: Missing username or password
-- `401 Unauthorized`: Invalid credentials
-- `423 Locked`: Account is temporarily locked
-- `429 Too Many Requests`: Too many failed login attempts (either user-based or IP-based)
-
-#### `POST /register`
-Creates a new user account.
-
-**Request Body:**
-```json
-{
-  "username": "string",
-  "email": "string",
-  "password": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "message": "Registration successful"
-}
-```
-
-**Error Responses:**
-- `400 Bad Request`: Validation error, common password, or existing username/email
-
-#### `POST /forgot-password`
-Initiates the password reset process.
-
-**Request Body:**
-```json
-{
-  "email": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "message": "If an account with this email exists, a verification code has been sent."
-}
-```
-
-#### `POST /verify-reset-token`
-Verifies the reset token before allowing password change.
-
-**Request Body:**
-```json
-{
-  "email": "string",
-  "token": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "message": "Verification code is valid. Please set a new password."
-}
-```
-
-**Error Responses:**
-- `400 Bad Request`: Invalid or expired verification code
-
-#### `POST /reset-password`
-Resets the password using a verified token.
-
-**Request Body:**
-```json
-{
-  "email": "string",
-  "token": "string",
-  "new_password": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "message": "Password has been reset successfully"
-}
-```
-
-**Error Responses:**
-- `400 Bad Request`: Invalid token, password validation failure, or password in history
-
-#### `GET /me`
-Retrieves information about the authenticated user.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (200 OK):**
-```json
-{
-  "username": "string",
-  "email": "string"
-}
-```
-
-**Error Responses:**
-- `401 Unauthorized`: Missing or invalid token
-
-#### `POST /change-password`
-Changes the password for the authenticated user.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request Body:**
-```json
-{
-  "oldPassword": "string",
-  "newPassword": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "message": "Password changed successfully"
-}
-```
-
-**Error Responses:**
-- `400 Bad Request`: Invalid new password, common password, or password in history
-- `401 Unauthorized`: Invalid old password or token
-
-### Customer Management Endpoints
-
-#### `GET /customers`
-Retrieves a list of all customers.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response (200 OK):**
-```json
-{
-  "customers": [
-    {
-      "id": 1,
-      "name": "string",
-      "internet_package": "string",
-      "sector": "string",
-      "date_added": "YYYY-MM-DD"
-    }
-  ]
-}
-```
-
-**Error Responses:**
-- `401 Unauthorized`: Missing or invalid token
-
-#### `POST /customers`
-Adds a new customer.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request Body:**
-```json
-{
-  "name": "string",
-  "internet_package": "string",
-  "sector": "string"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "message": "Customer added successfully"
-}
-```
-
-**Error Responses:**
-- `400 Bad Request`: Validation error
-- `401 Unauthorized`: Missing or invalid token
+1. Log in to the application
+2. Navigate to the Customer Management section
+3. Try SQL injection patterns in the input fields, such as:
+   ```
+   Test' OR 1=1 --
+   ```
+   or
+   ```
+   '; DROP TABLE customers; --
+   ```
+4. Observe the application's behavior and database impact
 
 ## Data Validation Rules
 
@@ -881,11 +585,8 @@ Authorization: Bearer <token>
 - Cannot be one of the user's last 3 passwords
 - Required field (cannot be empty)
 
-### Email Validation
-- Must follow standard email format (user@domain.tld)
-- Required field (cannot be empty)
-
 ### Customer Name Validation
+- ⚠️ **Vulnerable to XSS attacks**
 - Only English letters (a-z, A-Z) and spaces
 - Minimum 2 characters
 - Maximum 100 characters
@@ -907,3 +608,9 @@ Authorization: Bearer <token>
   - "West"
   - "Central"
 - Required field (cannot be empty)
+
+## Final Security Warning
+
+This application intentionally contains security vulnerabilities for educational and demonstration purposes only. **DO NOT use this version in production environments or with real user data.**
+
+After completing your security demonstrations or training, consider implementing proper security measures to address these vulnerabilities, or switch to a secure version of the application.
