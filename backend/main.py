@@ -146,12 +146,12 @@ class CustomerResponse(BaseModel):
     name: str
     internet_package: str
     sector: str
-    date_added: str  # Use string instead of date type
+    date_added: str
     
     # Sanitize data to prevent XSS
-    @validator('name', 'internet_package', 'sector')
-    def sanitize_fields(cls, v):
-        return sanitize_string(v)
+    # @validator('name', 'internet_package', 'sector')
+    # def sanitize_fields(cls, v):
+    #     return sanitize_string(v)
     
     class Config:
         from_attributes = True  # Updated from orm_mode = True
@@ -405,29 +405,13 @@ def verify_reset_token(data: VerifyTokenRequest, db: Session = Depends(get_db)):
     return {"message": "Verification code is valid. Please set a new password."}
 
 
-# Customer endpoints (protected by authentication)
 @app.post("/customers", response_model=MessageResponse)
 def add_customer(data: CustomerData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Validate customer name
-    is_valid, error_message = validate_customer_name(data.name)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
-    
-    # Validate internet package
-    is_valid, error_message = validate_internet_package(data.internet_package)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
-    
-    # Validate sector
-    is_valid, error_message = validate_sector(data.sector)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
-    
-    # Create new customer
+    # Create new customer without sanitization
     new_customer = Customer(
-        name=data.name,
-        internet_package=data.internet_package,
-        sector=data.sector
+        name=data.name,  # No sanitization
+        internet_package=data.internet_package,  # No sanitization
+        sector=data.sector  # No sanitization
     )
     
     db.add(new_customer)
@@ -439,19 +423,20 @@ def add_customer(data: CustomerData, current_user: User = Depends(get_current_us
 def get_customers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
     
-    # Convert to Pydantic models to leverage automatic validation and sanitization
+    # Directly convert from ORM objects to dict without sanitization
     customer_responses = []
     for customer in customers:
-        customer_responses.append(CustomerResponse(
-            id=customer.id,
-            name=customer.name,
-            internet_package=customer.internet_package,
-            sector=customer.sector,
-            date_added=customer.date_added.strftime("%Y-%m-%d")
-        ))
+        customer_responses.append({
+            "id": customer.id,
+            "name": customer.name,  # No sanitization
+            "internet_package": customer.internet_package,  # No sanitization
+            "sector": customer.sector,  # No sanitization
+            "date_added": customer.date_added.strftime("%Y-%m-%d")
+        })
     
     # Return in format matching CustomerListResponse
     return {"customers": customer_responses}
+
 
 # Endpoint to get current user info
 @app.get("/me", response_model=UserResponse)
