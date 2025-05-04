@@ -75,11 +75,9 @@ function CustomerManagement({ successMessage }) {
     setSector(e.target.value);
   };
 
-  // Helper function to safely render potentially escaped HTML
-  const createSafeDisplay = (str) => {
-    // Create a text node instead of using dangerouslySetInnerHTML
-    // This ensures that any sanitized HTML remains properly escaped
-    return str;
+  // Helper function to unsafely render HTML (vulnerable to XSS)
+  const createUnsafeDisplay = (str) => {
+    return <span dangerouslySetInnerHTML={{ __html: str }} />;
   };
 
   // Handle form submission
@@ -246,11 +244,11 @@ function CustomerManagement({ successMessage }) {
                   <tr key={customer.id}>
                     <td className="customer-name-cell">
                       <div className="truncate-text" title={customer.name}>
-                        {createSafeDisplay(customer.name)}
+                        {createUnsafeDisplay(customer.name)}
                       </div>
                     </td>
-                    <td>{createSafeDisplay(customer.internet_package)}</td>
-                    <td>{createSafeDisplay(customer.sector)}</td>
+                    <td>{createUnsafeDisplay(customer.internet_package)}</td>
+                    <td>{createUnsafeDisplay(customer.sector)}</td>
                     <td>{customer.date_added}</td>
                   </tr>
                 ))}
