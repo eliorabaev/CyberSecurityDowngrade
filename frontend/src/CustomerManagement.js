@@ -43,14 +43,17 @@ function CustomerManagement({ successMessage }) {
       
       if (response.ok) {
         const data = await response.json();
-        // The backend is now sanitizing data, so we can safely use it
+        // Use raw data without sanitization - XSS vulnerability
         setCustomers(data.customers || []);
       } else {
-        setMessage({ text: "Failed to load customers", type: "error" });
+        // Expose backend error message directly
+        const errorData = await response.json();
+        setMessage({ text: errorData.detail || "Failed to load customers", type: "error" });
       }
     } catch (error) {
+      // Expose detailed error information
+      setMessage({ text: `Error: ${error.toString()}`, type: "error" });
       console.error("Error fetching customers:", error);
-      setMessage({ text: "Error connecting to server", type: "error" });
     } finally {
       setIsLoading(false);
     }
@@ -83,6 +86,8 @@ function CustomerManagement({ successMessage }) {
   // Handle form submission
   const handleAddCustomer = async () => {
     try {
+      // No input validation - vulnerable
+
       // Send customer data to API
       const response = await fetch(`${config.apiUrl}/customers`, {
         method: "POST",
@@ -115,12 +120,14 @@ function CustomerManagement({ successMessage }) {
         // Refresh the customer list
         fetchCustomers();
       } else {
+        // Expose backend error message directly
         const errorData = await response.json();
         setMessage({ text: errorData.detail || "Failed to add customer", type: "error" });
       }
     } catch (error) {
+      // Expose detailed error information
+      setMessage({ text: `Error: ${error.toString()}`, type: "error" });
       console.error("Error adding customer:", error);
-      setMessage({ text: "Error connecting to server", type: "error" });
     }
   };
 
@@ -161,7 +168,7 @@ function CustomerManagement({ successMessage }) {
       </div>
       
       <div className="dashboard-message">
-        {message.text && <p className={`message ${message.type}`}>{message.text}</p>}
+        {message.text && <p className={`message ${message.type}`} dangerouslySetInnerHTML={{ __html: message.text }}></p>}
       </div>
       
       <div className="dashboard-content">
@@ -178,9 +185,6 @@ function CustomerManagement({ successMessage }) {
                   value={customerName}
                   onChange={handleCustomerNameChange}
                 />
-                <div className="requirements-text">
-                  Customer name can only contain English letters and spaces.
-                </div>
               </div>
             </div>
             

@@ -7,7 +7,7 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True)
+    username = Column(String(150), unique=True, index=True)
     email = Column(String(100), unique=True, index=True)
     password = Column(String(255))
 
@@ -42,7 +42,7 @@ class LoginAttempt(Base):
     __tablename__ = "login_attempts"
     
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), index=True)
+    username = Column(String(150), index=True)
     attempt_time = Column(DateTime, default=datetime.now)
     successful = Column(Boolean, default=False)
     ip_address = Column(String(45), nullable=True)  # Supports IPv6 addresses

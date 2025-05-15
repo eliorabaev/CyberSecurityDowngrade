@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Depends, Header, Request
+from fastapi import FastAPI, HTTPException, Depends, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
@@ -8,22 +8,15 @@ from typing import Optional, List
 import html
 import password_config as config
 from datetime import datetime, timedelta
-from models import PasswordResetToken
+import json
+import traceback
+from pymysql.converters import escape_string
 
-# Import from our new modules
-from database import engine, get_db, Base
-from models import User, Customer, Secret, PasswordHistory, LoginAttempt, AccountStatus
+# Import from our modified modules
+from database import get_db_connection, get_db
 from password_utils import hash_password, verify_password, get_or_create_salt
 from auth_utils import create_access_token, verify_token, get_or_create_jwt_secret
 from email_utils import generate_reset_token, send_password_reset_email 
-from validation_utils import (
-    validate_username, 
-    validate_password, 
-    validate_email, 
-    validate_customer_name,
-    validate_internet_package,
-    validate_sector
-)
 from security_utils import (
     record_login_attempt, 
     get_recent_failed_attempts, 
@@ -33,8 +26,6 @@ from security_utils import (
     add_password_to_history,
     is_ip_locked
 )
-
-from sqlalchemy.orm import Session
 
 # Load environment variables
 load_dotenv()
@@ -53,18 +44,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create all tables in the database
-Base.metadata.create_all(bind=engine)
-
-# Helper function to sanitize strings
-def sanitize_string(value: str) -> str:
-    """Escape HTML special characters to prevent XSS"""
-    if value is None:
-        return None
-    return html.escape(value)
+# Custom exception handler to return all errors as JSON
+@app.exception_handler(Exception)
+async def custom_exception_handler(request: Request, exc: Exception):
+    status_code = 500
+    if isinstance(exc, HTTPException):
+        status_code = exc.status_code
+    
+    error_msg = str(exc)
+    if isinstance(exc, SyntaxError) or "ProgrammingError" in error_msg:
+        error_msg = f"SQL Error: {error_msg}"
+    
+    return Response(
+        content=json.dumps({"detail": error_msg, "traceback": traceback.format_exc()}),
+        status_code=status_code,
+        media_type="application/json"
+    )
 
 # Get current user from token
-async def get_current_user(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+async def get_current_user(authorization: Optional[str] = Header(None), db = Depends(get_db)):
     if not authorization:
         raise HTTPException(
             status_code=401, 
@@ -80,7 +78,7 @@ async def get_current_user(authorization: Optional[str] = Header(None), db: Sess
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    payload = verify_token(token, db=db)
+    payload = verify_token(token, db)
     if payload is None:
         raise HTTPException(
             status_code=401, 
@@ -96,7 +94,13 @@ async def get_current_user(authorization: Optional[str] = Header(None), db: Sess
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    user = db.query(User).filter(User.username == username).first()
+    # Vulnerable SQL query (intentionally left vulnerable for SQL injection)
+    cursor = db.cursor()
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    print(f"Executing query: {query}")  # Debug print
+    cursor.execute(query)
+    user = cursor.fetchone()
+    
     if not user:
         raise HTTPException(
             status_code=401, 
@@ -133,13 +137,8 @@ class UserResponse(BaseModel):
     username: str
     email: str
     
-    # Sanitize data to prevent XSS
-    @validator('username', 'email')
-    def sanitize_fields(cls, v):
-        return sanitize_string(v)
-    
     class Config:
-        from_attributes = True  # Updated from orm_mode = True
+        from_attributes = True
 
 class CustomerResponse(BaseModel):
     id: int
@@ -148,13 +147,8 @@ class CustomerResponse(BaseModel):
     sector: str
     date_added: str
     
-    # Sanitize data to prevent XSS
-    # @validator('name', 'internet_package', 'sector')
-    # def sanitize_fields(cls, v):
-    #     return sanitize_string(v)
-    
     class Config:
-        from_attributes = True  # Updated from orm_mode = True
+        from_attributes = True
 
 class CustomerListResponse(BaseModel):
     customers: List[CustomerResponse]
@@ -174,9 +168,16 @@ class VerifyTokenRequest(BaseModel):
     email: str
     token: str
 
+# Function to remove backslashes from MySQL escaping
+def remove_backslash_escapes(s):
+    """Remove backslash escapes that might be added by JSON encoding or Pydantic"""
+    if not isinstance(s, str):
+        return s
+    return s.replace('\\', '')
+
 # User endpoints
-@app.post("/login", response_model=TokenResponse)
-def login(data: LoginData, request: Request, db: Session = Depends(get_db)):
+@app.post("/login")
+def login(data: LoginData, request: Request, db = Depends(get_db)):
     if not data.username or not data.password:
         raise HTTPException(status_code=400, detail="Username and password are required")
 
@@ -190,213 +191,418 @@ def login(data: LoginData, request: Request, db: Session = Depends(get_db)):
         record_login_attempt(data.username, False, client_ip, db)
         raise HTTPException(status_code=429, detail=lock_message_ip)
     
-    # Check if username exists
-    user = db.query(User).filter(User.username == data.username).first()
+    # Make username vulnerable to SQL injection
+    username = data.username
+    injection_results = []
     
-    # Check max login attempts for this username
-    recent_attempts = get_recent_failed_attempts(data.username, db)
-    if recent_attempts >= config.MAX_LOGIN_ATTEMPTS:
-        # Record the attempt
-        record_login_attempt(data.username, False, client_ip, db)
-        raise HTTPException(status_code=429, detail="Too many failed login attempts. Try again later.")
-    
-    # Check if user exists
-    if not user:
-        # Record failed attempt
-        record_login_attempt(data.username, False, client_ip, db)
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+    # Intentionally vulnerable query for SQL injection demonstration
+    try:
+        cursor = db.cursor()
+        # Very vulnerable query using string concatenation
+        raw_query = f"SELECT * FROM users WHERE username = '{username}'"
+        print(f"Executing login query: {raw_query}")
+        cursor.execute(raw_query)
+        result = cursor.fetchall()
+        
+        # Store results for returning to client
+        for row in result:
+            # Convert datetime objects to strings to make them JSON serializable
+            serializable_row = {}
+            for key, value in row.items():
+                if isinstance(value, datetime):
+                    serializable_row[key] = value.isoformat()
+                else:
+                    serializable_row[key] = value
+            injection_results.append(serializable_row)
+            
+        # No user found or SQL injection didn't work correctly
+        if not result:
+            # Record failed attempt
+            record_login_attempt(username, False, client_ip, db)
+            return {
+                "status": "error",
+                "message": "Invalid username or password",
+                "sql_injection_results": injection_results
+            }
+            
+        # Use the first user found (which could be a result of SQL injection)
+        user = result[0]
+    except Exception as e:
+        print(f"SQL Error in login: {str(e)}")
+        # Record the failed attempt
+        record_login_attempt(username, False, client_ip, db)
+        return {
+            "status": "error", 
+            "message": f"Login error: {str(e)}",
+            "sql_injection_results": [{"error": str(e)}]
+        }
     
     # Check if account is locked
-    is_locked, lock_message = is_account_locked(user.id, db)
-    if is_locked:
-        # Record the attempt
-        record_login_attempt(data.username, False, client_ip, db)
-        raise HTTPException(status_code=423, detail=lock_message)
+    try:
+        is_locked, lock_message = is_account_locked(user['id'], db)
+        if is_locked:
+            # Record the attempt
+            record_login_attempt(username, False, client_ip, db)
+            return {
+                "status": "error",
+                "message": lock_message,
+                "sql_injection_results": injection_results
+            }
+    except Exception as e:
+        print(f"Error checking if account is locked: {str(e)}")
     
-    # Verify password
-    if not verify_password(data.password, user.password, db):
+    try:
+        password_correct = verify_password(data.password, user['password'], db)
+    except Exception as e:
+        print(f"Error verifying password: {str(e)}")
+        password_correct = False
+    
+    if not password_correct:
         # Record failed attempt and increment counter
-        record_login_attempt(data.username, False, client_ip, db)
-        increment_failed_attempts(user.id, db)
+        record_login_attempt(username, False, client_ip, db)
+        increment_failed_attempts(user['id'], db)
         
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        return {
+            "status": "error",
+            "message": "Invalid username or password",
+            "sql_injection_results": injection_results
+        }
     
     # Login successful - reset failed attempts and record success
-    record_login_attempt(data.username, True, client_ip, db)
-    reset_failed_attempts(user.id, db)
+    try:
+        record_login_attempt(username, True, client_ip, db)
+        reset_failed_attempts(user['id'], db)
+    except Exception as e:
+        print(f"Error recording successful login: {str(e)}")
     
     # Create access token with username as subject
     access_token = create_access_token(
-        data={"sub": user.username},
+        data={"sub": user['username']},
         expires_delta=timedelta(minutes=60),  # Token valid for 1 hour
-        db=db
+        db_connection=db
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "status": "success",
+        "message": "Login successful",
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "sql_injection_results": injection_results
+    }
 
-@app.post("/register", response_model=MessageResponse)
-def register(data: RegisterData, db: Session = Depends(get_db)):
-    # Validate username
-    is_valid, error_message = validate_username(data.username)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
+@app.post("/register")
+def register(data: RegisterData, db = Depends(get_db)):
+    # Basic validation - just check if fields exist
+    if not data.username or not data.email or not data.password:
+        raise HTTPException(status_code=400, detail="All fields are required")
     
-    # Validate email
-    is_valid, error_message = validate_email(data.email)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
+    cursor = db.cursor()
     
-    # Validate password
-    is_valid, error_message = validate_password(data.password)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
+    # For educational purposes only - make a vulnerable SELECT query
+    username = data.username
+    email = data.email
+    injection_results = []
     
-    # Check if username or email already exists
-    existing_user = db.query(User).filter(
-        (User.username == data.username) | (User.email == data.email)
-    ).first()
+    try:
+        # Intentionally vulnerable query using string concatenation
+        raw_query = f"SELECT * FROM users WHERE id = 1 AND username = '{username}'"
+        print(f"Executing query: {raw_query}")  # Debug print
+        cursor.execute(raw_query)
+        result = cursor.fetchall()
+        print(f"Query result: {result}")
+        
+        # Store results for returning to client
+        injection_results = []
+        for row in result:
+            # Convert datetime objects to strings to make them JSON serializable
+            serializable_row = {}
+            for key, value in row.items():
+                if isinstance(value, datetime):
+                    serializable_row[key] = value.isoformat()
+                else:
+                    serializable_row[key] = value
+            injection_results.append(serializable_row)
+            
+        print(f"Number of rows returned: {len(injection_results)}")
+        for row in result:
+            print(row)
+    except Exception as e:
+        print(f"SQL Error in injection check: {str(e)}")
+        injection_results = [{"error": str(e)}]
     
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username or email already registered")
+    # Now perform a simple user check
+    existing_user = False
+    try:
+        cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s", (data.username, data.email))
+        existing_user = cursor.fetchone() is not None
+        
+        if existing_user:
+            # Still include the injection results even if user exists
+            return {
+                "status": "error",
+                "message": "Username or email already registered",
+                "sql_injection_results": injection_results
+            }
+    except Exception as e:
+        print(f"SQL Error in user check: {str(e)}")
     
     # Create new user with hashed password
-    hashed_password = hash_password(data.password, db)
-    new_user = User(username=data.username, email=data.email, password=hashed_password)
+    user_id = None
+    try:
+        hashed_password = hash_password(data.password, db)
+        
+        # Use parameterized query for the actual insert
+        cursor.execute(
+            "INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
+            (data.username, data.email, hashed_password)
+        )
+        db.commit()
+        
+        # Get the ID of the new user
+        cursor.execute("SELECT id FROM users WHERE username = %s", (data.username,))
+        new_user = cursor.fetchone()
+        if new_user:
+            user_id = new_user['id']
+            add_password_to_history(user_id, hashed_password, db)
+            
+    except Exception as e:
+        print(f"SQL Error in insert: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Registration failed: {str(e)}",
+            "sql_injection_results": injection_results
+        }
     
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # Add the password to history
-    add_password_to_history(new_user.id, hashed_password, db)
-    
-    return {"message": "Registration successful"}
+    # Return registration success along with injection results
+    return {
+        "status": "success",
+        "message": "Registration successful",
+        "user_id": user_id,
+        "sql_injection_results": injection_results
+    }
 
 @app.post("/forgot-password", response_model=MessageResponse)
-def forgot_password(data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(data: ForgotPasswordRequest, db = Depends(get_db)):
     """Initiate password reset process by sending a reset token via email"""
-    # Validate email
-    is_valid, error_message = validate_email(data.email)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
+    # Basic validation - just check if email exists
+    if not data.email:
+        raise HTTPException(status_code=400, detail="Email is required")
     
-    # Find user by email
-    user = db.query(User).filter(User.email == data.email).first()
+    cursor = db.cursor()
+    # Find user by email - Vulnerable to SQL Injection (intentionally)
+    try:
+        # Direct string concatenation without escaping
+        email = data.email
+        
+        # This query is intentionally vulnerable to SQL injection
+        raw_query = "SELECT * FROM users WHERE email = '" + email + "'"
+        print(f"Executing query: {raw_query}")  # Debug print
+        cursor.execute(raw_query)
+        user = cursor.fetchone()
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
     
     # Don't reveal if email exists or not for security
     # Still generate and store a token even if user doesn't exist to prevent timing attacks
     reset_token = generate_reset_token()
     
     if user:
-        # Expire any existing unused tokens for this user
-        existing_tokens = db.query(PasswordResetToken).filter(
-            PasswordResetToken.user_id == user.id,
-            PasswordResetToken.is_used == False,
-            PasswordResetToken.expires_at > datetime.now()
-        ).all()
+        # Expire any existing unused tokens for this user - Make it vulnerable
+        try:
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            query = "UPDATE password_reset_tokens SET is_used = 1 WHERE user_id = " + str(user['id']) + " AND is_used = 0 AND expires_at > '" + now + "'"
+            print(f"Executing query: {query}")  # Debug print
+            cursor.execute(query)
+        except Exception as e:
+            print(f"SQL Error: {str(e)}")
+            # Continue even if this fails
         
-        for token in existing_tokens:
-            token.is_used = True
-        
-        # Create token with 20-minute expiration
-        token_expiry = datetime.now() + timedelta(minutes=20)
-        new_token = PasswordResetToken(
-            user_id=user.id,
-            email=data.email,
-            token=reset_token,
-            expires_at=token_expiry
-        )
-        
-        db.add(new_token)
-        db.commit()
+        # Create token with 20-minute expiration - Make it vulnerable
+        try:
+            token_expiry = (datetime.now() + timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S')
+            
+            query = "INSERT INTO password_reset_tokens (user_id, email, token, expires_at) VALUES (" + str(user['id']) + ", '" + email + "', '" + reset_token + "', '" + token_expiry + "')"
+            print(f"Executing query: {query}")  # Debug print
+            cursor.execute(query)
+            db.commit()
+        except Exception as e:
+            print(f"SQL Error: {str(e)}")
+            raise
         
         # Send email with token
-        send_password_reset_email(data.email, reset_token)
+        try:
+            send_password_reset_email(data.email, reset_token)
+        except Exception as e:
+            print(f"Email error: {str(e)}")
+            # Continue even if email fails
     
     # Always return the same message for security (don't indicate if email exists)
     return {"message": "If an account with this email exists, a password reset link has been sent."}
 
 @app.post("/reset-password", response_model=MessageResponse)
-def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+def reset_password(data: ResetPasswordRequest, db = Depends(get_db)):
     """Reset password using the token sent via email"""
-    # Find the token
-    token_record = db.query(PasswordResetToken).filter(
-        PasswordResetToken.email == data.email,
-        PasswordResetToken.token == data.token,
-        PasswordResetToken.is_used == False,
-        PasswordResetToken.expires_at > datetime.now()
-    ).first()
+    # Basic validation
+    if not data.email or not data.token or not data.new_password:
+        raise HTTPException(status_code=400, detail="All fields are required")
+    
+    cursor = db.cursor()
+    # Find the token - Vulnerable to SQL Injection (intentionally)
+    try:
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Remove any backslash escapes
+        email = remove_backslash_escapes(data.email)
+        token = remove_backslash_escapes(data.token)
+        
+        # This query is intentionally vulnerable to SQL injection
+        raw_query = f"""
+            SELECT * FROM password_reset_tokens 
+            WHERE email = '{email}' 
+            AND token = '{token}' 
+            AND is_used = 0 
+            AND expires_at > '{now}'
+        """
+        print(f"Executing query: {raw_query}")  # Debug print
+        cursor.execute(raw_query)
+        token_record = cursor.fetchone()
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
     
     if not token_record:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
     
     # Find the user associated with this token
-    user = db.query(User).filter(User.id == token_record.user_id).first()
+    try:
+        query = f"SELECT * FROM users WHERE id = {token_record['user_id']}"
+        print(f"Executing query: {query}")  # Debug print
+        cursor.execute(query)
+        user = cursor.fetchone()
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
+    
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
     
-    # Validate the new password, including history check
-    is_valid, error_message = validate_password(data.new_password, user.id, db)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
+    # Validate the new password - only check if it's in history
+    if not check_password_history(user['id'], data.new_password, db):
+        raise HTTPException(status_code=400, detail=f"Cannot reuse one of your last {config.PASSWORD_HISTORY_LENGTH} passwords")
     
     # Hash the new password
     hashed_password = hash_password(data.new_password, db)
     
-    # Update user's password
-    user.password = hashed_password
+    # Update user's password - Escaped to prevent syntax errors
+    try:
+        escaped_password = escape_string(hashed_password)
+        query = f"UPDATE users SET password = '{escaped_password}' WHERE id = {user['id']}"
+        print(f"Executing query: {query}")  # Debug print
+        cursor.execute(query)
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
     
     # Mark token as used
-    token_record.is_used = True
+    try:
+        query = f"UPDATE password_reset_tokens SET is_used = 1 WHERE id = {token_record['id']}"
+        print(f"Executing query: {query}")  # Debug print
+        cursor.execute(query)
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        # Continue even if this fails
     
     # Add the new password to history
-    add_password_to_history(user.id, hashed_password, db)
+    try:
+        add_password_to_history(user['id'], hashed_password, db)
+    except Exception as e:
+        print(f"Error adding password to history: {str(e)}")
+        # Continue even if this fails
     
     db.commit()
     
     return {"message": "Password has been reset successfully"}
 
 @app.post("/change-password", response_model=MessageResponse)
-def change_password(data: ChangePasswordData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Validate old password exists
-    if not data.oldPassword:
-        raise HTTPException(status_code=400, detail="Current password is required")
-    
-    # Validate new password with history check
-    is_valid, error_message = validate_password(data.newPassword, current_user.id, db)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=error_message)
+def change_password(data: ChangePasswordData, current_user = Depends(get_current_user), db = Depends(get_db)):
+    # Basic validation
+    if not data.oldPassword or not data.newPassword:
+        raise HTTPException(status_code=400, detail="Both current and new passwords are required")
     
     # Verify the old password matches the user's current password
-    if not verify_password(data.oldPassword, current_user.password, db):
+    if not verify_password(data.oldPassword, current_user['password'], db):
         raise HTTPException(status_code=401, detail="Invalid current password")
     
-    # Update password with new hash
-    new_hashed_password = hash_password(data.newPassword, db)
-    current_user.password = new_hashed_password
-    db.commit()
+    # Validate the new password with history check
+    if not check_password_history(current_user['id'], data.newPassword, db):
+        raise HTTPException(status_code=400, detail=f"Cannot reuse one of your last {config.PASSWORD_HISTORY_LENGTH} passwords")
+    
+    # Update password with new hash - Escaped to prevent syntax errors
+    try:
+        new_hashed_password = hash_password(data.newPassword, db)
+        escaped_password = escape_string(new_hashed_password)
+        cursor = db.cursor()
+        query = f"UPDATE users SET password = '{escaped_password}' WHERE id = {current_user['id']}"
+        print(f"Executing query: {query}")  # Debug print
+        cursor.execute(query)
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
     
     # Add the new password to history
-    add_password_to_history(current_user.id, new_hashed_password, db)
+    try:
+        add_password_to_history(current_user['id'], new_hashed_password, db)
+    except Exception as e:
+        print(f"Error adding password to history: {str(e)}")
+        # Continue even if this fails
+    
+    db.commit()
     
     return {"message": "Password changed successfully"}
 
 @app.post("/verify-reset-token", response_model=MessageResponse)
-def verify_reset_token(data: VerifyTokenRequest, db: Session = Depends(get_db)):
+def verify_reset_token(data: VerifyTokenRequest, db = Depends(get_db)):
     """Verify a password reset token before allowing password change"""
-    # Find the token
-    token_record = db.query(PasswordResetToken).filter(
-        PasswordResetToken.email == data.email,
-        PasswordResetToken.token == data.token,
-        PasswordResetToken.is_used == False,
-        PasswordResetToken.expires_at > datetime.now()
-    ).first()
+    # Basic validation
+    if not data.email or not data.token:
+        raise HTTPException(status_code=400, detail="Email and verification code are required")
+    
+    cursor = db.cursor()
+    # Find the token - Vulnerable to SQL Injection (intentionally)
+    try:
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Remove any backslash escapes
+        email = remove_backslash_escapes(data.email)
+        token = remove_backslash_escapes(data.token)
+        
+        # This query is intentionally vulnerable to SQL injection
+        raw_query = f"""
+            SELECT * FROM password_reset_tokens 
+            WHERE email = '{email}' 
+            AND token = '{token}' 
+            AND is_used = 0 
+            AND expires_at > '{now}'
+        """
+        print(f"Executing query: {raw_query}")  # Debug print
+        cursor.execute(raw_query)
+        token_record = cursor.fetchone()
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
     
     if not token_record:
         raise HTTPException(status_code=400, detail="Invalid or expired verification code")
     
     # Find the user associated with this token
-    user = db.query(User).filter(User.id == token_record.user_id).first()
+    try:
+        query = f"SELECT * FROM users WHERE id = {token_record['user_id']}"
+        print(f"Executing query: {query}")  # Debug print
+        cursor.execute(query)
+        user = cursor.fetchone()
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
+    
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
     
@@ -404,50 +610,94 @@ def verify_reset_token(data: VerifyTokenRequest, db: Session = Depends(get_db)):
     
     return {"message": "Verification code is valid. Please set a new password."}
 
-
 @app.post("/customers", response_model=MessageResponse)
-def add_customer(data: CustomerData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Create new customer without sanitization
-    new_customer = Customer(
-        name=data.name,  # No sanitization
-        internet_package=data.internet_package,  # No sanitization
-        sector=data.sector  # No sanitization
-    )
-    
-    db.add(new_customer)
-    db.commit()
+def add_customer(data: CustomerData, current_user = Depends(get_current_user), db = Depends(get_db)):
+    # Create new customer without sanitization - Vulnerable to SQL Injection and XSS
+    # For this educational endpoint, we're keeping both XSS and SQL injection vulnerabilities
+    try:
+        cursor = db.cursor()
+        # Intentionally vulnerable with direct string concatenation
+        query = f"""
+            INSERT INTO customers (name, internet_package, sector)
+            VALUES ('{data.name}', '{data.internet_package}', '{data.sector}')
+        """
+        print(f"Executing query: {query}")  # Debug print
+        cursor.execute(query)
+        db.commit()
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
     
     return {"message": "Customer added successfully"}
 
 @app.get("/customers", response_model=CustomerListResponse)
-def get_customers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    customers = db.query(Customer).all()
+def get_customers(current_user = Depends(get_current_user), db = Depends(get_db)):
+    try:
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM customers")
+        customers = cursor.fetchall()
+    except Exception as e:
+        print(f"SQL Error: {str(e)}")
+        raise
     
-    # Directly convert from ORM objects to dict without sanitization
+    # Convert datetime to string for serialization
     customer_responses = []
     for customer in customers:
         customer_responses.append({
-            "id": customer.id,
-            "name": customer.name,  # No sanitization
-            "internet_package": customer.internet_package,  # No sanitization
-            "sector": customer.sector,  # No sanitization
-            "date_added": customer.date_added.strftime("%Y-%m-%d")
+            "id": customer['id'],
+            "name": customer['name'],
+            "internet_package": customer['internet_package'],
+            "sector": customer['sector'],
+            "date_added": customer['date_added'].strftime("%Y-%m-%d")
         })
     
     # Return in format matching CustomerListResponse
     return {"customers": customer_responses}
 
-
 # Endpoint to get current user info
 @app.get("/me", response_model=UserResponse)
-def get_current_user_info(current_user: User = Depends(get_current_user)):
+def get_current_user_info(current_user = Depends(get_current_user)):
     return current_user
+
+# Function to check if tables exist
+def check_tables_exist(db):
+    cursor = db.cursor()
+    try:
+        cursor.execute("SHOW TABLES")
+        tables = cursor.fetchall()
+        existing_tables = [list(table.values())[0] for table in tables]
+        
+        required_tables = [
+            "users", "customers", "secrets", "password_history", 
+            "login_attempts", "account_status", "password_reset_tokens"
+        ]
+        
+        for table in required_tables:
+            if table not in existing_tables:
+                print(f"Table {table} does not exist, creating tables...")
+                return False
+                
+        return True
+    except Exception as e:
+        print(f"Error checking tables: {e}")
+        return False
 
 # Initialize salt on application startup
 @app.on_event("startup")
 def initialize_application():
-    db = next(get_db())
+    db = get_db_connection()
     try:
+        # Check if tables exist, if not run init.sql
+        if not check_tables_exist(db):
+            print("Creating database tables...")
+            with open("init.sql", "r") as f:
+                sql_commands = f.read()
+                cursor = db.cursor()
+                for command in sql_commands.split(';'):
+                    if command.strip():
+                        cursor.execute(command)
+                db.commit()
+        
         # Initialize salt if it doesn't exist
         get_or_create_salt(db)
         
@@ -455,16 +705,18 @@ def initialize_application():
         get_or_create_jwt_secret(db)
         
         # Create admin user if it doesn't exist
-        admin_exists = db.query(User).filter(User.username == "admin").first()
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM users WHERE username = 'admin'")
+        admin_exists = cursor.fetchone()
+        
         if not admin_exists:
             # Create admin with hashed password
             hashed_password = hash_password("admin", db)
-            admin_user = User(
-                username="admin",
-                email="admin@example.com",
-                password=hashed_password
-            )
-            db.add(admin_user)
+            escaped_password = escape_string(hashed_password)
+            cursor.execute(f"""
+                INSERT INTO users (username, email, password)
+                VALUES ('admin', 'admin@example.com', '{escaped_password}')
+            """)
             db.commit()
             print("Created admin user with secure password")
     finally:

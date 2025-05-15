@@ -7,6 +7,8 @@ function Register() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [sqlResults, setSqlResults] = useState([]);
+  const [showSqlResults, setShowSqlResults] = useState(false);
 
   const handleUsernameChange = (e) => {
     setUsername(e.target.value);
@@ -22,7 +24,11 @@ function Register() {
 
   const handleRegister = async () => {
     setIsLoading(true);
+    setSqlResults([]);
+    setShowSqlResults(false);
+    
     try {
+      // No input validation - vulnerable
       const response = await fetch(`${config.apiUrl}/register`, {
         method: "POST",
         headers: {
@@ -31,29 +37,42 @@ function Register() {
         body: JSON.stringify({ username, email, password })
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setMessage(data.message);
+      const data = await response.json();
+      
+      // Handle SQL injection results if they exist
+      if (data.sql_injection_results && data.sql_injection_results.length > 0) {
+        setSqlResults(data.sql_injection_results);
+        setShowSqlResults(true);
+      }
+      
+      if (data.status === "success") {
+        setMessage(data.message || "Registration successful");
         
         // Clear fields after successful registration
         setUsername("");
         setEmail("");
         setPassword("");
         
-        // Redirect to login page after 2 seconds
+        // Redirect to login page after 5 seconds (longer to view SQL results)
         setTimeout(() => {
           window.location.href = "/";
-        }, 2000);
+        }, 5000);
       } else {
-        const errorData = await response.json();
-        setMessage(errorData.detail || "Registration failed");
+        // Handle error responses
+        setMessage(data.message || data.detail || "Registration failed");
       }
     } catch (error) {
+      // Expose detailed error information
+      setMessage(`Error: ${error.toString()}`);
       console.error("Registration error:", error);
-      setMessage("Error connecting to server");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Format JSON for display
+  const formatJson = (json) => {
+    return JSON.stringify(json, null, 2);
   };
 
   return (
@@ -110,7 +129,25 @@ function Register() {
       </div>
 
       <div className="login-message-container">
-        {message && <p className='login-message'>{message}</p>}
+        {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
+        
+        {/* Display SQL injection results */}
+        {showSqlResults && (
+          <div className="sql-results">
+            <h3>SQL Injection Results:</h3>
+            <pre style={{ 
+              textAlign: 'left', 
+              maxHeight: '300px', 
+              overflowY: 'auto',
+              padding: '10px',
+              backgroundColor: '#f0f0f0',
+              borderRadius: '4px',
+              border: '1px solid #ccc'
+            }}>
+              {formatJson(sqlResults)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

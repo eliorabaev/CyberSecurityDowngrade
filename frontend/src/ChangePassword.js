@@ -23,6 +23,8 @@ function ChangePassword() {
   const handleChangePassword = async () => {
     setIsLoading(true);
     try {
+      // No input validation - vulnerable
+
       const response = await fetch(`${config.apiUrl}/change-password`, {
         method: "POST",
         headers: {
@@ -35,8 +37,9 @@ function ChangePassword() {
         })
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
-        const data = await response.json();
         setMessage(data.message);
         
         // After successful password change, redirect back to dashboard
@@ -44,12 +47,13 @@ function ChangePassword() {
           window.location.href = "/dashboard?message=Password changed successfully!";
         }, 1500);
       } else {
-        const errorData = await response.json();
-        setMessage(errorData.detail || "Password change failed");
+        // Expose backend error message directly
+        setMessage(data.detail || "Password change failed");
       }
     } catch (error) {
+      // Expose detailed error information
+      setMessage(`Error: ${error.toString()}`);
       console.error("Change password error:", error);
-      setMessage("Error connecting to server");
     } finally {
       setIsLoading(false);
     }
@@ -83,8 +87,6 @@ function ChangePassword() {
           />
         </div>
 
-
-
         <button 
           className="connect-button" 
           onClick={handleChangePassword}
@@ -100,7 +102,7 @@ function ChangePassword() {
       </div>
 
       <div className="login-message-container">
-        {message && <p className='login-message'>{message}</p>}
+        {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
       </div>
     </div>
   );

@@ -1,6 +1,4 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+import pymysql
 import os
 import time
 from dotenv import load_dotenv
@@ -14,25 +12,25 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "dev_password")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "internet_service_provider")
 
-# Create database URL
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
-
 # Function to attempt database connection with retries
-def connect_with_retry(url, retries=20, delay=3):
+def connect_with_retry(max_retries=30, delay=3):
     """Connect to database with retry logic"""
     print(f"Attempting to connect to database at {DB_HOST}...")
     
-    for i in range(retries):
+    for retry in range(max_retries):
         try:
-            engine = create_engine(url)
-            # Test the connection
-            with engine.connect() as conn:
-                pass
+            connection = pymysql.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME,
+                cursorclass=pymysql.cursors.DictCursor
+            )
             print(f"Successfully connected to database at {DB_HOST}")
-            return engine
+            return connection
         except Exception as e:
-            if i < retries - 1:
-                print(f"Database connection failed. Retrying in {delay} seconds... ({i+1}/{retries})")
+            if retry < max_retries - 1:
+                print(f"Database connection failed. Retrying in {delay} seconds... ({retry+1}/{max_retries})")
                 print(f"Error: {str(e)}")
                 time.sleep(delay)
             else:
@@ -40,17 +38,15 @@ def connect_with_retry(url, retries=20, delay=3):
                 print(f"Final error: {str(e)}")
                 raise
 
-# Create engine with retry mechanism
-engine = connect_with_retry(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Function to get a database connection
+def get_db_connection():
+    """Get a raw database connection"""
+    return connect_with_retry()
 
-# Create shared base class - all models will use this
-Base = declarative_base()
-
-# Dependency to get database session
+# For backwards compatibility with dependency injection
 def get_db():
-    db = SessionLocal()
+    connection = get_db_connection()
     try:
-        yield db
+        yield connection
     finally:
-        db.close()
+        connection.close()
