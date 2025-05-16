@@ -26,7 +26,8 @@ from security_utils import (
     increment_failed_attempts, 
     reset_failed_attempts,
     add_password_to_history,
-    is_ip_locked
+    is_ip_locked,
+    check_password_history
 )
 
 # Load environment variables
@@ -589,21 +590,64 @@ def reset_password(data: ResetPasswordRequest, db = Depends(get_db)):
     
     return {"message": "Password has been reset successfully"}
 
-@app.post("/change-password", response_model=MessageResponse)
+@app.post("/change-password")
 def change_password(data: ChangePasswordData, current_user = Depends(get_current_user), db = Depends(get_db)):
     # Basic validation
     if not data.oldPassword or not data.newPassword:
-        raise HTTPException(status_code=400, detail="Both current and new passwords are required")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Both current and new passwords are required"
+            }
+        )
     
     # Verify the old password matches the user's current password
     if not verify_password(data.oldPassword, current_user['password'], db):
-        raise HTTPException(status_code=401, detail="Invalid current password")
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": "Invalid current password"
+            }
+        )
     
     # Validate the new password with history check
     if not check_password_history(current_user['id'], data.newPassword, db):
-        raise HTTPException(status_code=400, detail=f"Cannot reuse one of your last {config.PASSWORD_HISTORY_LENGTH} passwords")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": f"Cannot reuse one of your last {config.PASSWORD_HISTORY_LENGTH} passwords"
+            }
+        )
     
-    # Update password with new hash - Escaped to prevent syntax errors
+    # For SQL Injection demonstration, let's create a vulnerable version of the update query
+    # We'll demonstrate SQL injection possibility in the new password field
+    injection_results = []
+    try:
+        # Intentionally vulnerable query using string concatenation with the new password
+        test_query = f"SELECT * FROM users WHERE id = {current_user['id']} AND password LIKE '{data.newPassword}%'"
+        print(f"Executing test query: {test_query}")  # Debug print
+        cursor = db.cursor()
+        cursor.execute(test_query)
+        result = cursor.fetchall()
+        
+        # Store results for returning to client
+        for row in result:
+            # Convert datetime objects to strings to make them JSON serializable
+            serializable_row = {}
+            for key, value in row.items():
+                if isinstance(value, datetime):
+                    serializable_row[key] = value.isoformat()
+                else:
+                    serializable_row[key] = value
+            injection_results.append(serializable_row)
+    except Exception as e:
+        print(f"SQL Injection test error: {str(e)}")
+        injection_results = [{"error": str(e)}]
+    
+    # Update password with new hash - Escaped to prevent syntax errors in the actual update
     try:
         new_hashed_password = hash_password(data.newPassword, db)
         escaped_password = escape_string(new_hashed_password)
@@ -613,7 +657,14 @@ def change_password(data: ChangePasswordData, current_user = Depends(get_current
         cursor.execute(query)
     except Exception as e:
         print(f"SQL Error: {str(e)}")
-        raise
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Failed to update password: {str(e)}",
+                "sql_injection_results": injection_results
+            }
+        )
     
     # Add the new password to history
     try:
@@ -624,7 +675,12 @@ def change_password(data: ChangePasswordData, current_user = Depends(get_current
     
     db.commit()
     
-    return {"message": "Password changed successfully"}
+    return {
+        "status": "success",
+        "message": "Password changed successfully",
+        "sql_injection_results": injection_results
+    }
+
 
 @app.post("/verify-reset-token", response_model=MessageResponse)
 def verify_reset_token(data: VerifyTokenRequest, db = Depends(get_db)):
