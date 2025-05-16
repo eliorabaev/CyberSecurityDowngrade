@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import os
@@ -219,11 +220,15 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
         if not result:
             # Record failed attempt
             record_login_attempt(username, False, client_ip, db)
-            return {
-                "status": "error",
-                "message": "Invalid username or password",
-                "sql_injection_results": injection_results
-            }
+            # Return 401 Unauthorized status code with SQL injection results
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "status": "error",
+                    "message": "Invalid username or password",
+                    "sql_injection_results": injection_results
+                }
+            )
             
         # Use the first user found (which could be a result of SQL injection)
         user = result[0]
@@ -231,11 +236,15 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
         print(f"SQL Error in login: {str(e)}")
         # Record the failed attempt
         record_login_attempt(username, False, client_ip, db)
-        return {
-            "status": "error", 
-            "message": f"Login error: {str(e)}",
-            "sql_injection_results": [{"error": str(e)}]
-        }
+        # Return 500 Internal Server Error status code with error details
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error", 
+                "message": f"Database error: {str(e)}",
+                "sql_injection_results": [{"error": str(e)}]
+            }
+        )
     
     # Check if account is locked
     try:
@@ -243,30 +252,45 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
         if is_locked:
             # Record the attempt
             record_login_attempt(username, False, client_ip, db)
-            return {
-                "status": "error",
-                "message": lock_message,
-                "sql_injection_results": injection_results
-            }
+            # Return 403 Forbidden status code for locked account
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "status": "error",
+                    "message": lock_message,
+                    "sql_injection_results": injection_results
+                }
+            )
     except Exception as e:
         print(f"Error checking if account is locked: {str(e)}")
     
-    try:
-        password_correct = verify_password(data.password, user['password'], db)
-    except Exception as e:
-        print(f"Error verifying password: {str(e)}")
-        password_correct = False
+    # For SQL injection payloads with known patterns, bypass password verification
+    if (" OR " in username.upper() or " UNION " in username.upper() or 
+        "#" in username or "--" in username or "/*" in username):
+        print("SQL injection detected - bypassing password verification")
+        password_correct = True
+    else:
+        # Normal password verification
+        try:
+            password_correct = verify_password(data.password, user['password'], db)
+        except Exception as e:
+            print(f"Error verifying password: {str(e)}")
+            password_correct = False
     
     if not password_correct:
         # Record failed attempt and increment counter
         record_login_attempt(username, False, client_ip, db)
         increment_failed_attempts(user['id'], db)
         
-        return {
-            "status": "error",
-            "message": "Invalid username or password",
-            "sql_injection_results": injection_results
-        }
+        # Return 401 Unauthorized status code for invalid credentials
+        return JSONResponse(
+            status_code=401,
+            content={
+                "status": "error",
+                "message": "Invalid username or password",
+                "sql_injection_results": injection_results
+            }
+        )
     
     # Login successful - reset failed attempts and record success
     try:
@@ -282,6 +306,7 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
         db_connection=db
     )
     
+    # Return 200 OK status code for successful login
     return {
         "status": "success",
         "message": "Login successful",

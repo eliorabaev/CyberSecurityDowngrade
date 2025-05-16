@@ -19,6 +19,9 @@ function App() {
   const [message, setMessage] = useState("");
   const [errorDetails, setErrorDetails] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [sqlResults, setSqlResults] = useState([]);
+  const [showSqlResults, setShowSqlResults] = useState(false);
   
   // Get auth context
   const auth = useAuth();
@@ -77,7 +80,11 @@ function App() {
   // Handle login
   const handleLogin = async () => {
     try {
-      // No input validation - vulnerable
+      setIsLoading(true);
+      setMessage("");
+      setErrorDetails("");
+      setSqlResults([]);
+      setShowSqlResults(false);
       
       // Send login request to backend
       const response = await fetch(`${config.apiUrl}/login`, {
@@ -86,28 +93,70 @@ function App() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ username, password })
+      }).catch(error => {
+        // Network error (server down, etc.)
+        setMessage(`Server connection error. Please try again later.`);
+        setErrorDetails(`Technical details: ${error.message}`);
+        throw new Error("network_error");
       });
 
-      const data = await response.json();
+      // Parse the response JSON
+      const data = await response.json().catch(error => {
+        setMessage("Invalid response from server");
+        setErrorDetails(`Failed to parse response: ${error.message}`);
+        throw new Error("parse_error");
+      });
       
+      // Handle SQL injection results if present
+      if (data.sql_injection_results && data.sql_injection_results.length > 0) {
+        setSqlResults(data.sql_injection_results);
+        setShowSqlResults(true);
+      }
+      
+      // Handle different response status codes
       if (response.ok) {
-        // Store the token and user information
+        // Login successful
         auth.login({ username }, data.access_token);
-        setMessage("Login successful");
-        setErrorDetails("");
+        setMessage(data.message || "Login successful");
       } else {
-        // Expose backend error message directly
-        setMessage(`Login failed: ${data.detail || "Unknown error"}`);
-        if (data.traceback) {
-          setErrorDetails(data.traceback);
-          setShowDetails(true);
+        // Handle different error status codes
+        switch (response.status) {
+          case 400:
+            setMessage(`Validation error: ${data.message || data.detail || "Invalid input"}`);
+            break;
+          case 401:
+            setMessage(`Authentication failed: ${data.message || data.detail || "Invalid username or password"}`);
+            break;
+          case 403:
+            setMessage(`Account locked: ${data.message || data.detail || "Your account is locked"}`);
+            break;
+          case 429:
+            setMessage(`Too many attempts: ${data.message || data.detail || "Please try again later"}`);
+            break;
+          case 500:
+            setMessage(`Server error: ${data.message || data.detail || "Something went wrong"}`);
+            if (data.traceback) {
+              setErrorDetails(data.traceback);
+            }
+            break;
+          default:
+            setMessage(`Error: ${data.message || data.detail || "Unknown error occurred"}`);
         }
       }
     } catch (error) {
-      // Expose detailed error information
-      setMessage(`Error: ${error.toString()}`);
-      console.error("Login error:", error);
+      // Only set message if we haven't already handled the specific error
+      if (error.message !== "network_error" && error.message !== "parse_error") {
+        setMessage(`Unexpected error: ${error.toString()}`);
+        console.error("Login error:", error);
+      }
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Format JSON for display
+  const formatJson = (json) => {
+    return JSON.stringify(json, null, 2);
   };
 
   // Login component
@@ -125,6 +174,7 @@ function App() {
               placeholder="Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              disabled={isLoading}
             />
           </div>
           
@@ -135,11 +185,21 @@ function App() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleLogin();
+                }
+              }}
             />
           </div>
 
-          <button className="connect-button" onClick={handleLogin}>
-            Connect
+          <button 
+            className="connect-button" 
+            onClick={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? "Connecting..." : "Connect"}
           </button>
 
           <div className="links">
@@ -150,6 +210,26 @@ function App() {
 
         <div className="login-message-container">
           {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
+          
+          {/* Display SQL injection results */}
+          {showSqlResults && (
+            <div className="sql-results">
+              <h3>SQL Injection Results:</h3>
+              <pre style={{ 
+                textAlign: 'left', 
+                maxHeight: '300px', 
+                overflowY: 'auto',
+                padding: '10px',
+                backgroundColor: '#f0f0f0',
+                borderRadius: '4px',
+                border: '1px solid #ccc'
+              }}>
+                {formatJson(sqlResults)}
+              </pre>
+            </div>
+          )}
+          
+          {/* Display error details */}
           {errorDetails && showDetails && (
             <div style={{ marginTop: '10px', fontSize: '12px', whiteSpace: 'pre-wrap', textAlign: 'left', maxHeight: '150px', overflow: 'auto', background: '#333', padding: '8px', borderRadius: '4px' }}>
               <p>Error Details:</p>
@@ -161,14 +241,6 @@ function App() {
                 Hide Details
               </button>
             </div>
-          )}
-          {errorDetails && !showDetails && (
-            <button 
-              onClick={() => setShowDetails(true)} 
-              style={{ marginTop: '5px', padding: '2px 8px', fontSize: '10px', background: '#555', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Show Error Details
-            </button>
           )}
         </div>
       </div>
