@@ -132,22 +132,14 @@ function Register() {
         {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
         
         {/* Display SQL injection results */}
-        {showSqlResults && (
-          <div className="sql-results">
-            <h3>SQL Injection Results:</h3>
-            <pre style={{ 
-              textAlign: 'left', 
-              maxHeight: '300px', 
-              overflowY: 'auto',
-              padding: '10px',
-              backgroundColor: '#f0f0f0',
-              borderRadius: '4px',
-              border: '1px solid #ccc'
-            }}>
-              {formatJson(sqlResults)}
-            </pre>
-          </div>
-        )}
+          {showSqlResults && (
+            <div className="sql-results">
+              <h3>SQL Injection Results:</h3>
+              <pre>
+                {formatJson(sqlResults)}
+              </pre>
+            </div>
+          )}
       </div>
     </div>
   );
