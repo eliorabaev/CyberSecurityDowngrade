@@ -8,118 +8,20 @@ import ForgotPassword from './ForgotPassword';
 import ChangePassword from './ChangePassword';
 import CustomerManagement from './CustomerManagement';
 
-function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [fieldErrors, setFieldErrors] = useState({
-    username: '',
-    password: ''
-  });
-  
-  // Use the auth context
-  const auth = useAuth();
-
-  const handleLogin = async () => {
-    try {
-      // Reset errors
-      setFieldErrors({
-        username: '',
-        password: ''
-      });
-      
-      // Form validation
-      const errors = {
-        username: username ? '' : "Username is required",
-        password: password ? '' : "Password is required"
-      };
-      
-      setFieldErrors(errors);
-      
-      // Check if there are any validation errors
-      if (!username || !password) {
-        setMessage("Please enter both username and password");
-        return;
-      }
-      
-      // Send login request to backend
-      const response = await fetch(`${config.apiUrl}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ username, password })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Store the token and user information
-        auth.login({ username }, data.access_token);
-        setMessage("Login successful");
-      } else {
-        const errorData = await response.json();
-        setMessage(errorData.detail || "Login failed");
-      }
-    } catch (error) {
-      setMessage("Error connecting to server");
-      console.error("Login error:", error);
-    }
-  };
-
-  // If logged in, redirect to CustomerManagement
-  if (auth.isAuthenticated) {
-    return <CustomerManagement />;
-  }
-
-  return (
-    <div className="login-box">
-      <div className="form-content">
-        <h1>Welcome Admin</h1>
-        <p>Sign in to continue</p>
-
-        <div className="field-wrapper">
-          <input
-            type="text"
-            className={`input-field ${fieldErrors.username ? 'input-error' : ''}`}
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          {fieldErrors.username && <div className="error-message">{fieldErrors.username}</div>}
-        </div>
-        
-        <div className="field-wrapper">
-          <input
-            type="password"
-            className={`input-field ${fieldErrors.password ? 'input-error' : ''}`}
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          {fieldErrors.password && <div className="error-message">{fieldErrors.password}</div>}
-        </div>
-
-        <button className="connect-button" onClick={handleLogin}>
-          Connect
-        </button>
-
-        <div className="links">
-          <a href="/forgot-password" className="link">Forgot Password?</a>
-          <a href="/register" className="link">Register</a>
-        </div>
-      </div>
-
-      <div className="login-message-container">
-        {message && <p className='login-message'>{message}</p>}
-      </div>
-    </div>
-  );
-}
-
 function App() {
   // State to track current path and any success messages
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [successMessage, setSuccessMessage] = useState(null);
+  
+  // Login states
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [errorDetails, setErrorDetails] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [sqlResults, setSqlResults] = useState([]);
+  const [showSqlResults, setShowSqlResults] = useState(false);
   
   // Get auth context
   const auth = useAuth();
@@ -175,23 +77,200 @@ function App() {
     };
   }, []);
 
+  // Handle login
+  const handleLogin = async () => {
+    try {
+      setIsLoading(true);
+      setMessage("");
+      setErrorDetails("");
+      setSqlResults([]);
+      setShowSqlResults(false);
+      
+      // Send login request to backend
+      const response = await fetch(`${config.apiUrl}/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ username, password })
+      }).catch(error => {
+        // Network error (server down, etc.)
+        setMessage(`Server connection error. Please try again later.`);
+        setErrorDetails(`Technical details: ${error.message}`);
+        throw new Error("network_error");
+      });
+
+      // Parse the response JSON
+      const data = await response.json().catch(error => {
+        setMessage("Invalid response from server");
+        setErrorDetails(`Failed to parse response: ${error.message}`);
+        throw new Error("parse_error");
+      });
+      
+      // Handle SQL injection results if present
+      if (data.sql_injection_results && data.sql_injection_results.length > 0) {
+        setSqlResults(data.sql_injection_results);
+        setShowSqlResults(true);
+      }
+      
+      // Handle different response status codes
+      if (response.ok) {
+        // Login successful
+        auth.login({ username }, data.access_token);
+        setMessage(data.message || "Login successful");
+      } else {
+        // Handle different error status codes
+        switch (response.status) {
+          case 400:
+            setMessage(`Validation error: ${data.message || data.detail || "Invalid input"}`);
+            break;
+          case 401:
+            setMessage(`Authentication failed: ${data.message || data.detail || "Invalid username or password"}`);
+            break;
+          case 403:
+            setMessage(`Account locked: ${data.message || data.detail || "Your account is locked"}`);
+            break;
+          case 429:
+            setMessage(`Too many attempts: ${data.message || data.detail || "Please try again later"}`);
+            break;
+          case 500:
+            setMessage(`Server error: ${data.message || data.detail || "Something went wrong"}`);
+            if (data.traceback) {
+              setErrorDetails(data.traceback);
+            }
+            break;
+          default:
+            setMessage(`Error: ${data.message || data.detail || "Unknown error occurred"}`);
+        }
+      }
+    } catch (error) {
+      // Only set message if we haven't already handled the specific error
+      if (error.message !== "network_error" && error.message !== "parse_error") {
+        setMessage(`Unexpected error: ${error.toString()}`);
+        console.error("Login error:", error);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Format JSON for display
+  const formatJson = (json) => {
+    return JSON.stringify(json, null, 2);
+  };
+
+  // Login component
+  const renderLogin = () => {
+    return (
+      <div className="login-box">
+        <div className="form-content">
+          <h1>Welcome Admin</h1>
+          <p>Sign in to continue</p>
+
+          <div className="field-wrapper">
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+          
+          <div className="field-wrapper">
+            <input
+              type="password"
+              className="input-field"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleLogin();
+                }
+              }}
+            />
+          </div>
+
+          <button 
+            className="connect-button" 
+            onClick={handleLogin}
+            disabled={isLoading}
+          >
+            {isLoading ? "Connecting..." : "Connect"}
+          </button>
+
+          <div className="links">
+            <a href="/forgot-password" className="link">Forgot Password?</a>
+            <a href="/register" className="link">Register</a>
+          </div>
+        </div>
+
+        <div className="login-message-container">
+          {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
+          
+          {/* Display SQL injection results */}
+          {showSqlResults && (
+            <div className="sql-results">
+              <h3>SQL Injection Results:</h3>
+              <pre style={{ 
+                textAlign: 'left', 
+                maxHeight: '300px', 
+                overflowY: 'auto',
+                padding: '10px',
+                backgroundColor: '#f0f0f0',
+                borderRadius: '4px',
+                border: '1px solid #ccc'
+              }}>
+                {formatJson(sqlResults)}
+              </pre>
+            </div>
+          )}
+          
+          {/* Display error details */}
+          {errorDetails && showDetails && (
+            <div style={{ marginTop: '10px', fontSize: '12px', whiteSpace: 'pre-wrap', textAlign: 'left', maxHeight: '150px', overflow: 'auto', background: '#333', padding: '8px', borderRadius: '4px' }}>
+              <p>Error Details:</p>
+              <pre>{errorDetails}</pre>
+              <button 
+                onClick={() => setShowDetails(false)} 
+                style={{ marginTop: '5px', padding: '2px 8px', fontSize: '10px', background: '#555', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                Hide Details
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Show loading state while authentication is initializing
   if (auth.loading) {
     return <div>Loading...</div>;
   }
 
   // Return the appropriate component based on the current path
-  switch (currentPath) {
-    case '/register':
-      return <Register />;
-    case '/forgot-password':
-      return <ForgotPassword />;
-    case '/change-password':
-      return auth.isAuthenticated ? <ChangePassword /> : <Login />;
-    case '/dashboard':
-      return auth.isAuthenticated ? <CustomerManagement successMessage={successMessage} /> : <Login />;
-    default:
-      return <Login />;
+  if (auth.isAuthenticated) {
+    switch (currentPath) {
+      case '/change-password':
+        return <ChangePassword />;
+      case '/dashboard':
+      default:
+        return <CustomerManagement successMessage={successMessage} />;
+    }
+  } else {
+    // If not authenticated, show login or registration pages
+    switch (currentPath) {
+      case '/register':
+        return <Register />;
+      case '/forgot-password':
+        return <ForgotPassword />;
+      default:
+        return renderLogin();
+    }
   }
 }
 

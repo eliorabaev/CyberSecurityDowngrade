@@ -7,6 +7,8 @@ function Register() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [sqlResults, setSqlResults] = useState([]);
+  const [showSqlResults, setShowSqlResults] = useState(false);
 
   const handleUsernameChange = (e) => {
     setUsername(e.target.value);
@@ -20,40 +22,86 @@ function Register() {
     setPassword(e.target.value);
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleRegister();
+    }
+  };
+
   const handleRegister = async () => {
     setIsLoading(true);
+    setSqlResults([]);
+    setShowSqlResults(false);
+    setMessage("");
+    
     try {
+      // No input validation - vulnerable
       const response = await fetch(`${config.apiUrl}/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ username, email, password })
+      }).catch(error => {
+        // Network error (server down, etc.)
+        setMessage(`Server connection error. Please try again later. (${error.message})`);
+        throw new Error("network_error");
       });
 
+      const data = await response.json().catch(error => {
+        setMessage(`Invalid response from server. (${error.message})`);
+        throw new Error("parse_error");
+      });
+      
+      // Handle SQL injection results if they exist
+      if (data.sql_injection_results && data.sql_injection_results.length > 0) {
+        setSqlResults(data.sql_injection_results);
+        setShowSqlResults(true);
+      }
+      
+      // Handle response based on status code
       if (response.ok) {
-        const data = await response.json();
-        setMessage(data.message);
+        setMessage(data.message || "Registration successful");
         
         // Clear fields after successful registration
         setUsername("");
         setEmail("");
         setPassword("");
         
-        // Redirect to login page after 2 seconds
+        // Redirect to login page after 5 seconds (longer to view SQL results)
         setTimeout(() => {
           window.location.href = "/";
-        }, 2000);
+        }, 5000);
       } else {
-        const errorData = await response.json();
-        setMessage(errorData.detail || "Registration failed");
+        // Handle different error status codes
+        switch (response.status) {
+          case 400:
+            setMessage(`Validation error: ${data.message || "All fields are required"}`);
+            break;
+          case 409:
+            setMessage(`Registration failed: ${data.message || "Username or email already exists"}`);
+            break;
+          case 500:
+            setMessage(`Server error: ${data.message || "Something went wrong"}`);
+            break;
+          default:
+            setMessage(`Error (${response.status}): ${data.message || data.detail || "Registration failed"}`);
+        }
       }
     } catch (error) {
-      console.error("Registration error:", error);
-      setMessage("Error connecting to server");
+      // Only set message if we haven't already handled the specific error
+      if (error.message !== "network_error" && error.message !== "parse_error") {
+        setMessage(`Unexpected error: ${error.toString()}`);
+        console.error("Registration error:", error);
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Format JSON for display
+  const formatJson = (json) => {
+    return JSON.stringify(json, null, 2);
   };
 
   return (
@@ -69,6 +117,7 @@ function Register() {
             placeholder="Username"
             value={username}
             onChange={handleUsernameChange}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
         </div>
@@ -80,6 +129,7 @@ function Register() {
             placeholder="Email"
             value={email}
             onChange={handleEmailChange}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
         </div>
@@ -91,6 +141,7 @@ function Register() {
             placeholder="Password"
             value={password}
             onChange={handlePasswordChange}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
         </div>
@@ -110,7 +161,16 @@ function Register() {
       </div>
 
       <div className="login-message-container">
-        {message && <p className='login-message'>{message}</p>}
+        {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
+        
+        {/* Display SQL injection results in the same div as the server response */}
+        {showSqlResults && (
+          <div className="sql-results">
+            <pre>
+              {formatJson(sqlResults)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

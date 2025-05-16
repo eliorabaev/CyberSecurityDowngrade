@@ -25,6 +25,8 @@ function ForgotPassword() {
     
     setIsLoading(true);
     try {
+      // No input validation - vulnerable
+      
       const response = await fetch(`${config.apiUrl}/forgot-password`, {
         method: "POST",
         headers: {
@@ -33,19 +35,21 @@ function ForgotPassword() {
         body: JSON.stringify({ email })
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
-        const data = await response.json();
         setMessage(data.message);
         setVerifiedEmail(email); // Store email for next steps
         // Move to token verification step
         setCurrentStep("token");
       } else {
-        const errorData = await response.json();
-        setMessage(errorData.detail || "Request failed");
+        // Expose backend error message directly
+        setMessage(data.detail || "Request failed");
       }
     } catch (error) {
+      // Expose detailed error information
+      setMessage(`Error: ${error.toString()}`);
       console.error("Forgot password error:", error);
-      setMessage("Error connecting to server");
     } finally {
       setIsLoading(false);
     }
@@ -60,6 +64,8 @@ function ForgotPassword() {
     
     setIsLoading(true);
     try {
+      // No input validation - vulnerable
+      
       const response = await fetch(`${config.apiUrl}/verify-reset-token`, {
         method: "POST",
         headers: {
@@ -68,19 +74,21 @@ function ForgotPassword() {
         body: JSON.stringify({ email: verifiedEmail, token })
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
-        const data = await response.json();
         setMessage(data.message);
         setVerifiedToken(token); // Store the verified token
         // Move to new password step
         setCurrentStep("password");
       } else {
-        const errorData = await response.json();
-        setMessage(errorData.detail || "Invalid verification code");
+        // Expose backend error message directly
+        setMessage(data.detail || "Invalid verification code");
       }
     } catch (error) {
+      // Expose detailed error information
+      setMessage(`Error: ${error.toString()}`);
       console.error("Token verification error:", error);
-      setMessage("Error connecting to server");
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +103,8 @@ function ForgotPassword() {
     
     setIsLoading(true);
     try {
+      // No input validation - vulnerable
+      
       const response = await fetch(`${config.apiUrl}/reset-password`, {
         method: "POST",
         headers: {
@@ -107,8 +117,9 @@ function ForgotPassword() {
         })
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
-        const data = await response.json();
         setMessage(data.message);
         
         // After successful password reset, redirect to login page after 2 seconds
@@ -116,12 +127,13 @@ function ForgotPassword() {
           window.location.href = "/?message=Your password has been reset successfully.";
         }, 2000);
       } else {
-        const errorData = await response.json();
-        setMessage(errorData.detail || "Password reset failed");
+        // Expose backend error message directly
+        setMessage(data.detail || "Password reset failed");
       }
     } catch (error) {
+      // Expose detailed error information
+      setMessage(`Error: ${error.toString()}`);
       console.error("Reset password error:", error);
-      setMessage("Error connecting to server");
     } finally {
       setIsLoading(false);
     }
@@ -246,7 +258,7 @@ function ForgotPassword() {
       </div>
 
       <div className="login-message-container">
-        {message && <p className='login-message'>{message}</p>}
+        {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
       </div>
     </div>
   );
