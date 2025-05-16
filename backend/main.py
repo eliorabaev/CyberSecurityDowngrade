@@ -19,6 +19,7 @@ from database import get_db_connection, get_db
 from password_utils import hash_password, verify_password, get_or_create_salt
 from auth_utils import create_access_token, verify_token, get_or_create_jwt_secret
 from email_utils import generate_reset_token, send_password_reset_email 
+from validation_utils import validate_password
 from security_utils import (
     record_login_attempt, 
     get_recent_failed_attempts, 
@@ -29,6 +30,8 @@ from security_utils import (
     is_ip_locked,
     check_password_history
 )
+
+
 
 # Load environment variables
 load_dotenv()
@@ -350,6 +353,17 @@ def register(data: RegisterData, db = Depends(get_db)):
             }
         )
     
+    is_valid, password_msg = validate_password(data.password)
+    if not is_valid:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": password_msg,
+                "sql_injection_results": []
+            }
+        )
+    
     cursor = db.cursor()
     
     # For educational purposes only - make a vulnerable SELECT query
@@ -602,13 +616,23 @@ def change_password(data: ChangePasswordData, current_user = Depends(get_current
             }
         )
     
-    # Verify the old password matches the user's current password
     if not verify_password(data.oldPassword, current_user['password'], db):
         return JSONResponse(
             status_code=401,
             content={
                 "status": "error",
                 "message": "Invalid current password"
+            }
+        )
+
+    is_valid, password_msg = validate_password(data.newPassword, current_user['id'], db)
+    if not is_valid:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": password_msg,
+                "sql_injection_results": injection_results if 'injection_results' in locals() else []
             }
         )
     
