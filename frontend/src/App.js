@@ -20,8 +20,6 @@ function App() {
   const [errorDetails, setErrorDetails] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [sqlResults, setSqlResults] = useState([]);
-  const [showSqlResults, setShowSqlResults] = useState(false);
   
   // Get auth context
   const auth = useAuth();
@@ -83,8 +81,6 @@ function App() {
       setIsLoading(true);
       setMessage("");
       setErrorDetails("");
-      setSqlResults([]);
-      setShowSqlResults(false);
       
       // Send login request to backend
       const response = await fetch(`${config.apiUrl}/login`, {
@@ -106,12 +102,6 @@ function App() {
         setErrorDetails(`Failed to parse response: ${error.message}`);
         throw new Error("parse_error");
       });
-      
-      // Handle SQL injection results if present
-      if (data.sql_injection_results && data.sql_injection_results.length > 0) {
-        setSqlResults(data.sql_injection_results);
-        setShowSqlResults(true);
-      }
       
       // Handle different response status codes
       if (response.ok) {
@@ -152,11 +142,6 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Format JSON for display
-  const formatJson = (json) => {
-    return JSON.stringify(json, null, 2);
   };
 
   // Login component
@@ -209,37 +194,24 @@ function App() {
         </div>
 
         <div className="login-message-container">
+          {/* Using dangerouslySetInnerHTML is intentionally vulnerable to XSS */}
           {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
           
-          {/* Display SQL injection results */}
-          {showSqlResults && (
-            <div className="sql-results">
-              <h3>SQL Injection Results:</h3>
-              <pre style={{ 
-                textAlign: 'left', 
-                maxHeight: '300px', 
-                overflowY: 'auto',
-                padding: '10px',
-                backgroundColor: '#f0f0f0',
-                borderRadius: '4px',
-                border: '1px solid #ccc'
-              }}>
-                {formatJson(sqlResults)}
-              </pre>
-            </div>
-          )}
-          
-          {/* Display error details */}
-          {errorDetails && showDetails && (
-            <div style={{ marginTop: '10px', fontSize: '12px', whiteSpace: 'pre-wrap', textAlign: 'left', maxHeight: '150px', overflow: 'auto', background: '#333', padding: '8px', borderRadius: '4px' }}>
-              <p>Error Details:</p>
-              <pre>{errorDetails}</pre>
-              <button 
-                onClick={() => setShowDetails(false)} 
-                style={{ marginTop: '5px', padding: '2px 8px', fontSize: '10px', background: '#555', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                Hide Details
-              </button>
+          {/* Display error details if available */}
+          {errorDetails && (
+            <div className="error-details">
+              <p>
+                <button 
+                  onClick={() => setShowDetails(!showDetails)} 
+                  className="details-toggle"
+                >
+                  {showDetails ? "Hide Details" : "Show Details"}
+                </button>
+              </p>
+              
+              {showDetails && (
+                <pre className="error-details-content">{errorDetails}</pre>
+              )}
             </div>
           )}
         </div>
