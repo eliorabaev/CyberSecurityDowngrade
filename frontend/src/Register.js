@@ -22,10 +22,17 @@ function Register() {
     setPassword(e.target.value);
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleRegister();
+    }
+  };
+
   const handleRegister = async () => {
     setIsLoading(true);
     setSqlResults([]);
     setShowSqlResults(false);
+    setMessage("");
     
     try {
       // No input validation - vulnerable
@@ -35,9 +42,16 @@ function Register() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ username, email, password })
+      }).catch(error => {
+        // Network error (server down, etc.)
+        setMessage(`Server connection error. Please try again later. (${error.message})`);
+        throw new Error("network_error");
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(error => {
+        setMessage(`Invalid response from server. (${error.message})`);
+        throw new Error("parse_error");
+      });
       
       // Handle SQL injection results if they exist
       if (data.sql_injection_results && data.sql_injection_results.length > 0) {
@@ -45,7 +59,8 @@ function Register() {
         setShowSqlResults(true);
       }
       
-      if (data.status === "success") {
+      // Handle response based on status code
+      if (response.ok) {
         setMessage(data.message || "Registration successful");
         
         // Clear fields after successful registration
@@ -58,13 +73,27 @@ function Register() {
           window.location.href = "/";
         }, 5000);
       } else {
-        // Handle error responses
-        setMessage(data.message || data.detail || "Registration failed");
+        // Handle different error status codes
+        switch (response.status) {
+          case 400:
+            setMessage(`Validation error: ${data.message || "All fields are required"}`);
+            break;
+          case 409:
+            setMessage(`Registration failed: ${data.message || "Username or email already exists"}`);
+            break;
+          case 500:
+            setMessage(`Server error: ${data.message || "Something went wrong"}`);
+            break;
+          default:
+            setMessage(`Error (${response.status}): ${data.message || data.detail || "Registration failed"}`);
+        }
       }
     } catch (error) {
-      // Expose detailed error information
-      setMessage(`Error: ${error.toString()}`);
-      console.error("Registration error:", error);
+      // Only set message if we haven't already handled the specific error
+      if (error.message !== "network_error" && error.message !== "parse_error") {
+        setMessage(`Unexpected error: ${error.toString()}`);
+        console.error("Registration error:", error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -88,6 +117,7 @@ function Register() {
             placeholder="Username"
             value={username}
             onChange={handleUsernameChange}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
         </div>
@@ -99,6 +129,7 @@ function Register() {
             placeholder="Email"
             value={email}
             onChange={handleEmailChange}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
         </div>
@@ -110,6 +141,7 @@ function Register() {
             placeholder="Password"
             value={password}
             onChange={handlePasswordChange}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
         </div>
@@ -131,15 +163,14 @@ function Register() {
       <div className="login-message-container">
         {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
         
-        {/* Display SQL injection results */}
-          {showSqlResults && (
-            <div className="sql-results">
-              <h3>SQL Injection Results:</h3>
-              <pre>
-                {formatJson(sqlResults)}
-              </pre>
-            </div>
-          )}
+        {/* Display SQL injection results in the same div as the server response */}
+        {showSqlResults && (
+          <div className="sql-results">
+            <pre>
+              {formatJson(sqlResults)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

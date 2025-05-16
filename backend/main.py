@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import json
 import traceback
 from pymysql.converters import escape_string
+import re 
 
 # Import from our modified modules
 from database import get_db_connection, get_db
@@ -110,6 +111,15 @@ async def get_current_user(authorization: Optional[str] = Header(None), db = Dep
         )
     
     return user
+
+def is_valid_email(email: str) -> bool:
+    """
+    Validates email format using regex
+    """
+    # Basic email regex pattern
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
 
 # Pydantic models for request/response
 class TokenResponse(BaseModel):
@@ -319,7 +329,25 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
 def register(data: RegisterData, db = Depends(get_db)):
     # Basic validation - just check if fields exist
     if not data.username or not data.email or not data.password:
-        raise HTTPException(status_code=400, detail="All fields are required")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "All fields are required",
+                "sql_injection_results": []
+            }
+        )
+    
+    # Email format validation
+    if not is_valid_email(data.email):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Invalid email format",
+                "sql_injection_results": []
+            }
+        )
     
     cursor = db.cursor()
     
@@ -356,20 +384,30 @@ def register(data: RegisterData, db = Depends(get_db)):
         injection_results = [{"error": str(e)}]
     
     # Now perform a simple user check
-    existing_user = False
     try:
         cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s", (data.username, data.email))
-        existing_user = cursor.fetchone() is not None
+        existing_user = cursor.fetchone()
         
         if existing_user:
             # Still include the injection results even if user exists
-            return {
-                "status": "error",
-                "message": "Username or email already registered",
-                "sql_injection_results": injection_results
-            }
+            return JSONResponse(
+                status_code=409,  # Conflict status code for already existing resource
+                content={
+                    "status": "error",
+                    "message": f"A user with this {'username' if existing_user['username'] == data.username else 'email'} already exists",
+                    "sql_injection_results": injection_results
+                }
+            )
     except Exception as e:
         print(f"SQL Error in user check: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Database error checking user existence: {str(e)}",
+                "sql_injection_results": injection_results
+            }
+        )
     
     # Create new user with hashed password
     user_id = None
@@ -392,11 +430,14 @@ def register(data: RegisterData, db = Depends(get_db)):
             
     except Exception as e:
         print(f"SQL Error in insert: {str(e)}")
-        return {
-            "status": "error",
-            "message": f"Registration failed: {str(e)}",
-            "sql_injection_results": injection_results
-        }
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Registration failed: {str(e)}",
+                "sql_injection_results": injection_results
+            }
+        )
     
     # Return registration success along with injection results
     return {
