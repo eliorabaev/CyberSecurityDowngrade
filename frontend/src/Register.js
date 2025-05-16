@@ -7,8 +7,6 @@ function Register() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sqlResults, setSqlResults] = useState([]);
-  const [showSqlResults, setShowSqlResults] = useState(false);
 
   const handleUsernameChange = (e) => {
     setUsername(e.target.value);
@@ -30,8 +28,6 @@ function Register() {
 
   const handleRegister = async () => {
     setIsLoading(true);
-    setSqlResults([]);
-    setShowSqlResults(false);
     setMessage("");
     
     try {
@@ -53,25 +49,11 @@ function Register() {
         throw new Error("parse_error");
       });
       
-      // Handle SQL injection results if they exist
-      if (data.sql_injection_results && data.sql_injection_results.length > 0) {
-        setSqlResults(data.sql_injection_results);
-        setShowSqlResults(true);
-      }
-      
       // Handle response based on status code
       if (response.ok) {
         setMessage(data.message || "Registration successful");
         
-        // Clear fields after successful registration
-        setUsername("");
-        setEmail("");
-        setPassword("");
-        
-        // Redirect to login page after 5 seconds (longer to view SQL results)
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 5000);
+        // Removed the redirect code
       } else {
         // Handle different error status codes
         switch (response.status) {
@@ -97,11 +79,6 @@ function Register() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Format JSON for display
-  const formatJson = (json) => {
-    return JSON.stringify(json, null, 2);
   };
 
   return (
@@ -161,16 +138,8 @@ function Register() {
       </div>
 
       <div className="login-message-container">
+        {/* Using dangerouslySetInnerHTML is intentionally vulnerable to XSS */}
         {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
-        
-        {/* Display SQL injection results in the same div as the server response */}
-        {showSqlResults && (
-          <div className="sql-results">
-            <pre>
-              {formatJson(sqlResults)}
-            </pre>
-          </div>
-        )}
       </div>
     </div>
   );

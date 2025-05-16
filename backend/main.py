@@ -194,121 +194,78 @@ def remove_backslash_escapes(s):
 @app.post("/login")
 def login(data: LoginData, request: Request, db = Depends(get_db)):
     if not data.username or not data.password:
-        raise HTTPException(status_code=400, detail="Username and password are required")
+        return {"status": "error", "message": "Username and password are required"}
 
     # Get user's IP address for logging
     client_ip = request.client.host if request.client else "unknown"
     
-    # FIRST: Check if IP is locked due to too many failed attempts
+    # Check if IP is locked due to too many failed attempts
     is_locked_ip, lock_message_ip = is_ip_locked(client_ip, db)
     if is_locked_ip:
         # Record the attempt
         record_login_attempt(data.username, False, client_ip, db)
-        raise HTTPException(status_code=429, detail=lock_message_ip)
+        return {"status": "error", "message": lock_message_ip}
     
-    # Make username vulnerable to SQL injection
-    username = data.username
-    injection_results = []
-    
-    # Intentionally vulnerable query for SQL injection demonstration
     try:
         cursor = db.cursor()
-        # Very vulnerable query using string concatenation
-        raw_query = f"SELECT * FROM users WHERE username = '{username}'"
-        print(f"Executing login query: {raw_query}")
-        cursor.execute(raw_query)
+        
+        # VULNERABLE: Direct string concatenation in query
+        query = "SELECT * FROM users WHERE username = '" + data.username + "'"
+        
+        cursor.execute(query)
         result = cursor.fetchall()
         
-        # Store results for returning to client
-        for row in result:
-            # Convert datetime objects to strings to make them JSON serializable
-            serializable_row = {}
-            for key, value in row.items():
-                if isinstance(value, datetime):
-                    serializable_row[key] = value.isoformat()
-                else:
-                    serializable_row[key] = value
-            injection_results.append(serializable_row)
-            
-        # No user found or SQL injection didn't work correctly
+        # No user found
         if not result:
             # Record failed attempt
-            record_login_attempt(username, False, client_ip, db)
-            # Return 401 Unauthorized status code with SQL injection results
-            return JSONResponse(
-                status_code=401,
-                content={
-                    "status": "error",
-                    "message": "Invalid username or password",
-                    "sql_injection_results": injection_results
-                }
-            )
+            record_login_attempt(data.username, False, client_ip, db)
+            return {"status": "error", "message": "Invalid username or password"}
             
-        # Use the first user found (which could be a result of SQL injection)
+        # If multiple users found (possible in SQL injection), use the first one
+        # This makes it exploitable with UNION attacks
         user = result[0]
-    except Exception as e:
-        print(f"SQL Error in login: {str(e)}")
-        # Record the failed attempt
-        record_login_attempt(username, False, client_ip, db)
-        # Return 500 Internal Server Error status code with error details
-        return JSONResponse(
-            status_code=500,
-            content={
+        
+        # The vulnerable part: if data is found via SQL injection, show it in the error
+        if len(result) > 1:
+            # This leaks data in the error message, similar to bWAPP
+            first_row_data = str(result[0])
+            record_login_attempt(data.username, False, client_ip, db)
+            return {
                 "status": "error", 
-                "message": f"Database error: {str(e)}",
-                "sql_injection_results": [{"error": str(e)}]
+                "message": f"Authentication error: {first_row_data[:100]}"
             }
-        )
+            
+    except Exception as e:
+        # Record the failed attempt
+        record_login_attempt(data.username, False, client_ip, db)
+        # Intentionally leaking error details that might contain DB schema info
+        return {"status": "error", "message": f"Login error: {str(e)}"}
     
     # Check if account is locked
     try:
         is_locked, lock_message = is_account_locked(user['id'], db)
         if is_locked:
             # Record the attempt
-            record_login_attempt(username, False, client_ip, db)
-            # Return 403 Forbidden status code for locked account
-            return JSONResponse(
-                status_code=403,
-                content={
-                    "status": "error",
-                    "message": lock_message,
-                    "sql_injection_results": injection_results
-                }
-            )
+            record_login_attempt(data.username, False, client_ip, db)
+            return {"status": "error", "message": lock_message}
     except Exception as e:
         print(f"Error checking if account is locked: {str(e)}")
     
-    # For SQL injection payloads with known patterns, bypass password verification
-    if (" OR " in username.upper() or " UNION " in username.upper() or 
-        "#" in username or "--" in username or "/*" in username):
-        print("SQL injection detected - bypassing password verification")
-        password_correct = True
-    else:
-        # Normal password verification
-        try:
-            password_correct = verify_password(data.password, user['password'], db)
-        except Exception as e:
-            print(f"Error verifying password: {str(e)}")
-            password_correct = False
+    # Normal password verification
+    try:
+        password_correct = verify_password(data.password, user['password'], db)
+    except Exception as e:
+        password_correct = False
     
     if not password_correct:
         # Record failed attempt and increment counter
-        record_login_attempt(username, False, client_ip, db)
+        record_login_attempt(data.username, False, client_ip, db)
         increment_failed_attempts(user['id'], db)
-        
-        # Return 401 Unauthorized status code for invalid credentials
-        return JSONResponse(
-            status_code=401,
-            content={
-                "status": "error",
-                "message": "Invalid username or password",
-                "sql_injection_results": injection_results
-            }
-        )
+        return {"status": "error", "message": "Invalid username or password"}
     
     # Login successful - reset failed attempts and record success
     try:
-        record_login_attempt(username, True, client_ip, db)
+        record_login_attempt(data.username, True, client_ip, db)
         reset_failed_attempts(user['id'], db)
     except Exception as e:
         print(f"Error recording successful login: {str(e)}")
@@ -320,148 +277,72 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
         db_connection=db
     )
     
-    # Return 200 OK status code for successful login
+    # Return successful login
     return {
         "status": "success",
         "message": "Login successful",
         "access_token": access_token, 
-        "token_type": "bearer",
-        "sql_injection_results": injection_results
+        "token_type": "bearer"
     }
 
 @app.post("/register")
 def register(data: RegisterData, db = Depends(get_db)):
-    # Basic validation - just check if fields exist
+    # Basic validation
     if not data.username or not data.email or not data.password:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error",
-                "message": "All fields are required",
-                "sql_injection_results": []
-            }
-        )
+        return {"status": "error", "message": "All fields are required"}
     
     # Email format validation
     if not is_valid_email(data.email):
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error",
-                "message": "Invalid email format",
-                "sql_injection_results": []
-            }
-        )
+        return {"status": "error", "message": "Invalid email format"}
     
     is_valid, password_msg = validate_password(data.password)
     if not is_valid:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error",
-                "message": password_msg,
-                "sql_injection_results": []
-            }
-        )
+        return {"status": "error", "message": password_msg}
     
     cursor = db.cursor()
     
-    # For educational purposes only - make a vulnerable SELECT query
-    username = data.username
-    email = data.email
-    injection_results = []
-    
     try:
-        # Intentionally vulnerable query using string concatenation
-        raw_query = f"SELECT * FROM users WHERE id = 1 AND username = '{username}'"
-        print(f"Executing query: {raw_query}")  # Debug print
-        cursor.execute(raw_query)
+        # VULNERABLE: Direct string concatenation in query
+        # This query is constructed in a way that UNION attacks can work
+        query = "SELECT * FROM users WHERE username = '" + data.username + "'"
+        
+        cursor.execute(query)
         result = cursor.fetchall()
-        print(f"Query result: {result}")
         
-        # Store results for returning to client
-        injection_results = []
-        for row in result:
-            # Convert datetime objects to strings to make them JSON serializable
-            serializable_row = {}
-            for key, value in row.items():
-                if isinstance(value, datetime):
-                    serializable_row[key] = value.isoformat()
-                else:
-                    serializable_row[key] = value
-            injection_results.append(serializable_row)
-            
-        print(f"Number of rows returned: {len(injection_results)}")
-        for row in result:
-            print(row)
-    except Exception as e:
-        print(f"SQL Error in injection check: {str(e)}")
-        injection_results = [{"error": str(e)}]
-    
-    # Now perform a simple user check
-    try:
-        cursor.execute("SELECT * FROM users WHERE username = %s OR email = %s", (data.username, data.email))
-        existing_user = cursor.fetchone()
+        # Check if user exists by username
+        if result and len(result) > 0:
+            # The key vulnerability: this will return data from UNION queries
+            # in the error message, similar to bWAPP
+            row_data = str(result[0])
+            return {"status": "error", "message": f"User already exists: {row_data[:100]}"}
         
-        if existing_user:
-            # Still include the injection results even if user exists
-            return JSONResponse(
-                status_code=409,  # Conflict status code for already existing resource
-                content={
-                    "status": "error",
-                    "message": f"A user with this {'username' if existing_user['username'] == data.username else 'email'} already exists",
-                    "sql_injection_results": injection_results
-                }
-            )
-    except Exception as e:
-        print(f"SQL Error in user check: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error",
-                "message": f"Database error checking user existence: {str(e)}",
-                "sql_injection_results": injection_results
-            }
-        )
-    
-    # Create new user with hashed password
-    user_id = None
-    try:
+        # Check if email exists (using parameterized query for this check)
+        cursor.execute("SELECT * FROM users WHERE email = %s", (data.email,))
+        if cursor.fetchone():
+            return {"status": "error", "message": "Email already in use"}
+        
+        # Insert new user with properly hashed password
         hashed_password = hash_password(data.password, db)
         
-        # Use parameterized query for the actual insert
-        cursor.execute(
-            "INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-            (data.username, data.email, hashed_password)
-        )
+        # Another vulnerability in the insert query
+        insert_query = f"INSERT INTO users (username, email, password) VALUES ('{data.username}', '{data.email}', '{hashed_password}')"
+        cursor.execute(insert_query)
         db.commit()
         
         # Get the ID of the new user
         cursor.execute("SELECT id FROM users WHERE username = %s", (data.username,))
         new_user = cursor.fetchone()
-        if new_user:
-            user_id = new_user['id']
+        user_id = new_user['id'] if new_user else None
+        
+        if user_id:
             add_password_to_history(user_id, hashed_password, db)
-            
+        
+        return {"status": "success", "message": "Registration successful", "user_id": user_id}
+        
     except Exception as e:
-        print(f"SQL Error in insert: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error",
-                "message": f"Registration failed: {str(e)}",
-                "sql_injection_results": injection_results
-            }
-        )
+        # Error message includes the exception which may contain SQL info
+        return {"status": "error", "message": f"Registration error: {str(e)}"}
     
-    # Return registration success along with injection results
-    return {
-        "status": "success",
-        "message": "Registration successful",
-        "user_id": user_id,
-        "sql_injection_results": injection_results
-    }
-
 @app.post("/forgot-password", response_model=MessageResponse)
 def forgot_password(data: ForgotPasswordRequest, db = Depends(get_db)):
     """Initiate password reset process by sending a reset token via email"""
