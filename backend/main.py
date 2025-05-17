@@ -343,64 +343,64 @@ def register(data: RegisterData, db = Depends(get_db)):
         # Error message includes the exception which may contain SQL info
         return {"status": "error", "message": f"Registration error: {str(e)}"}
     
-@app.post("/forgot-password", response_model=MessageResponse)
+@app.post("/forgot-password")
 def forgot_password(data: ForgotPasswordRequest, db = Depends(get_db)):
     """Initiate password reset process by sending a reset token via email"""
-    # Basic validation - just check if email exists
+    # Basic validation
     if not data.email:
-        raise HTTPException(status_code=400, detail="Email is required")
+        return {"status": "error", "message": "Email is required"}
     
     cursor = db.cursor()
-    # Find user by email - Vulnerable to SQL Injection (intentionally)
-    try:
-        # Direct string concatenation without escaping
-        email = data.email
-        
-        # This query is intentionally vulnerable to SQL injection
-        raw_query = "SELECT * FROM users WHERE email = '" + email + "'"
-        print(f"Executing query: {raw_query}")  # Debug print
-        cursor.execute(raw_query)
-        user = cursor.fetchone()
-    except Exception as e:
-        print(f"SQL Error: {str(e)}")
-        raise
     
-    # Don't reveal if email exists or not for security
-    # Still generate and store a token even if user doesn't exist to prevent timing attacks
+    try:
+        # VULNERABLE: Direct string concatenation in email lookup
+        query = "SELECT * FROM users WHERE email = '" + data.email + "'"
+        cursor.execute(query)
+        user = cursor.fetchone()
+        
+        # Check for SQL injection pattern revealing multiple users
+        result = cursor.fetchall()
+        if len(result) > 0:
+            # VULNERABLE: Leaks data from the query in the error message
+            row_data = str(result[0])
+            return {"status": "error", "message": f"Error processing request: {row_data[:100]}"}
+            
+    except Exception as e:
+        # VULNERABLE: Returns database error details to the client
+        return {"status": "error", "message": f"Database error: {str(e)}"}
+    
+    # Generate token
     reset_token = generate_reset_token()
     
     if user:
-        # Expire any existing unused tokens for this user - Make it vulnerable
         try:
+            # Expire any existing tokens
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            query = "UPDATE password_reset_tokens SET is_used = 1 WHERE user_id = " + str(user['id']) + " AND is_used = 0 AND expires_at > '" + now + "'"
-            print(f"Executing query: {query}")  # Debug print
-            cursor.execute(query)
-        except Exception as e:
-            print(f"SQL Error: {str(e)}")
-            # Continue even if this fails
-        
-        # Create token with 20-minute expiration - Make it vulnerable
-        try:
+            
+            # VULNERABLE: Another string concatenation
+            expire_query = "UPDATE password_reset_tokens SET is_used = 1 WHERE user_id = " + str(user['id']) + " AND is_used = 0"
+            cursor.execute(expire_query)
+            
+            # Create new token with 20-minute expiration
             token_expiry = (datetime.now() + timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S')
             
-            query = "INSERT INTO password_reset_tokens (user_id, email, token, expires_at) VALUES (" + str(user['id']) + ", '" + email + "', '" + reset_token + "', '" + token_expiry + "')"
-            print(f"Executing query: {query}")  # Debug print
-            cursor.execute(query)
+            # VULNERABLE: More string concatenation
+            insert_query = "INSERT INTO password_reset_tokens (user_id, email, token, expires_at) VALUES (" + str(user['id']) + ", '" + data.email + "', '" + reset_token + "', '" + token_expiry + "')"
+            cursor.execute(insert_query)
             db.commit()
+            
+            # Send email with token
+            try:
+                send_password_reset_email(data.email, reset_token)
+            except Exception as e:
+                print(f"Email error: {str(e)}")
+                # Still commit the token to database even if email fails
         except Exception as e:
-            print(f"SQL Error: {str(e)}")
-            raise
-        
-        # Send email with token
-        try:
-            send_password_reset_email(data.email, reset_token)
-        except Exception as e:
-            print(f"Email error: {str(e)}")
-            # Continue even if email fails
+            # VULNERABLE: Leaks more database info in the error
+            return {"status": "error", "message": f"Error creating reset token: {str(e)}"}
     
-    # Always return the same message for security (don't indicate if email exists)
-    return {"message": "If an account with this email exists, a password reset link has been sent."}
+    # Return generic message for security
+    return {"status": "success", "message": "If an account with this email exists, a password reset link has been sent."}
 
 @app.post("/reset-password", response_model=MessageResponse)
 def reset_password(data: ResetPasswordRequest, db = Depends(get_db)):
