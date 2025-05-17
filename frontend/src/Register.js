@@ -26,6 +26,12 @@ function Register() {
     }
   };
 
+  // Handle direct navigation to login
+  const handleReturnToLogin = (e) => {
+    e.preventDefault();
+    window.location.href = '/';
+  };
+
   const handleRegister = async () => {
     setIsLoading(true);
     setMessage("");
@@ -132,8 +138,9 @@ function Register() {
         </button>
 
         <div className="links">
-          <a href="/" className="link">Already have an account?</a>
-          <a href="/" className="link">Login</a>
+          {/* Replace href with direct navigation handler */}
+          <a href="#" className="link" onClick={handleReturnToLogin}>Already have an account?</a>
+          <a href="#" className="link" onClick={handleReturnToLogin}>Login</a>
         </div>
       </div>
 
