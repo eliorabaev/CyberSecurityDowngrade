@@ -26,7 +26,6 @@ function ForgotPassword() {
     setIsLoading(true);
     try {
       // No input validation - vulnerable
-      
       const response = await fetch(`${config.apiUrl}/forgot-password`, {
         method: "POST",
         headers: {
@@ -37,14 +36,15 @@ function ForgotPassword() {
 
       const data = await response.json();
       
-      if (response.ok) {
+      // Use data.status from our updated backend
+      if (data.status === "success") {
         setMessage(data.message);
         setVerifiedEmail(email); // Store email for next steps
         // Move to token verification step
         setCurrentStep("token");
       } else {
-        // Expose backend error message directly
-        setMessage(data.detail || "Request failed");
+        // Display error message from backend (which might contain SQLI data)
+        setMessage(data.message || "Request failed");
       }
     } catch (error) {
       // Expose detailed error information
@@ -65,7 +65,6 @@ function ForgotPassword() {
     setIsLoading(true);
     try {
       // No input validation - vulnerable
-      
       const response = await fetch(`${config.apiUrl}/verify-reset-token`, {
         method: "POST",
         headers: {
@@ -76,14 +75,15 @@ function ForgotPassword() {
 
       const data = await response.json();
       
-      if (response.ok) {
-        setMessage(data.message);
+      // Use data.status from our updated backend
+      if (data.status === "success") {
+        setMessage(data.message || "Token verified successfully");
         setVerifiedToken(token); // Store the verified token
         // Move to new password step
         setCurrentStep("password");
       } else {
-        // Expose backend error message directly
-        setMessage(data.detail || "Invalid verification code");
+        // Display error message from backend (which might contain SQLI data)
+        setMessage(data.message || "Invalid verification code");
       }
     } catch (error) {
       // Expose detailed error information
@@ -104,7 +104,6 @@ function ForgotPassword() {
     setIsLoading(true);
     try {
       // No input validation - vulnerable
-      
       const response = await fetch(`${config.apiUrl}/reset-password`, {
         method: "POST",
         headers: {
@@ -119,7 +118,8 @@ function ForgotPassword() {
 
       const data = await response.json();
       
-      if (response.ok) {
+      // Use data.status from our updated backend
+      if (data.status === "success") {
         setMessage(data.message);
         
         // After successful password reset, redirect to login page after 2 seconds
@@ -127,8 +127,8 @@ function ForgotPassword() {
           window.location.href = "/?message=Your password has been reset successfully.";
         }, 2000);
       } else {
-        // Expose backend error message directly
-        setMessage(data.detail || "Password reset failed");
+        // Display error message from backend (which might contain SQLI data)
+        setMessage(data.message || "Password reset failed");
       }
     } catch (error) {
       // Expose detailed error information
@@ -137,6 +137,12 @@ function ForgotPassword() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Handle direct navigation to login
+  const handleReturnToLogin = (e) => {
+    e.preventDefault();
+    window.location.href = '/';
   };
 
   // Render email submission form (Step 1)
@@ -240,7 +246,9 @@ function ForgotPassword() {
         {renderCurrentStep()}
 
         <div className="links">
-          <a href="/" className="link">Return to Login</a>
+          {/* Use direct window.location navigation like in other components */}
+          <a href="#" className="link" onClick={handleReturnToLogin}>Return to Login</a>
+          
           {currentStep === "token" && (
             <a 
               href="#" 
@@ -254,10 +262,24 @@ function ForgotPassword() {
               Use Different Email
             </a>
           )}
+          {currentStep === "password" && (
+            <a 
+              href="#" 
+              className="link" 
+              onClick={(e) => {
+                e.preventDefault();
+                setCurrentStep("token");
+                setMessage("");
+              }}
+            >
+              Re-enter Code
+            </a>
+          )}
         </div>
       </div>
 
       <div className="login-message-container">
+        {/* Using dangerouslySetInnerHTML is intentionally vulnerable to XSS */}
         {message && <p className='login-message' dangerouslySetInnerHTML={{ __html: message }}></p>}
       </div>
     </div>
