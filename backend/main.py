@@ -211,34 +211,57 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
         # VULNERABLE: Direct string concatenation in query
         query = "SELECT * FROM users WHERE username = '" + data.username + "'"
         
+        # Log the actual query for debugging
+        print(f"Executing query: {query}")
+        
+        # Execute the query
         cursor.execute(query)
         result = cursor.fetchall()
+        
+        raw_results = []
+        for row in result:
+            # Convert each row to a raw string representation
+            raw_row = "{"
+            for key, value in row.items():
+                # Handle different data types for display
+                if isinstance(value, str):
+                    raw_row += f"'{key}': '{value}', "
+                elif value is None:
+                    raw_row += f"'{key}': NULL, "
+                else:
+                    raw_row += f"'{key}': {value}, "
+            raw_row = raw_row.rstrip(", ") + "}"
+            raw_results.append(raw_row)
+        
+        # Combine all rows into a single raw output string
+        raw_output = "Results:\n" + "\n".join(raw_results)
         
         # No user found
         if not result:
             # Record failed attempt
             record_login_attempt(data.username, False, client_ip, db)
-            return {"status": "error", "message": "Invalid username or password"}
             
-        # If multiple users found (possible in SQL injection), use the first one
-        # This makes it exploitable with UNION attacks
-        user = result[0]
-        
-        # The vulnerable part: if data is found via SQL injection, show it in the error
+            # Return raw SQL info even when no results are found
+            return {"status": "error", "message": f"No results found."}
+            
+        # If multiple users found - classic sign of SQL injection
         if len(result) > 1:
-            # This leaks data in the error message, similar to bWAPP
-            first_row_data = str(result[0])
+            # Record the attempt
             record_login_attempt(data.username, False, client_ip, db)
+            
             return {
                 "status": "error", 
-                "message": f"Authentication error: {first_row_data[:100]}"
+                "message": f"{query}\ {len(result)}\n{raw_output[:500]}"
             }
+            
+        # Select first user for authentication
+        user = result[0]
             
     except Exception as e:
         # Record the failed attempt
         record_login_attempt(data.username, False, client_ip, db)
         # Intentionally leaking error details that might contain DB schema info
-        return {"status": "error", "message": f"Login error: {str(e)}"}
+        return {"status": "error", "message": f"[SQL Error] {str(e)}\nQuery: {query}"}
     
     # Check if account is locked
     try:
@@ -260,7 +283,9 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
         # Record failed attempt and increment counter
         record_login_attempt(data.username, False, client_ip, db)
         increment_failed_attempts(user['id'], db)
-        return {"status": "error", "message": "Invalid username or password"}
+        
+        # Even with incorrect password, expose raw SQL data
+        return {"status": "error", "message": f"[SQL] Authentication failed.\nQuery: {query}\n{raw_output[:500]}"}
     
     # Login successful - reset failed attempts and record success
     try:
@@ -311,7 +336,6 @@ def register(data: RegisterData, db = Depends(get_db)):
         # Check if user exists by username
         if result and len(result) > 0:
             # The key vulnerability: this will return data from UNION queries
-            # in the error message, similar to bWAPP
             row_data = str(result[0])
             return {"status": "error", "message": f"User already exists: {row_data[:100]}"}
         
