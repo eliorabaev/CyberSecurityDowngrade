@@ -218,33 +218,7 @@ The application has been modified to remove SQL protection measures:
    # Direct string concatenation without parameterization
    query = f"SELECT * FROM users WHERE username = '{username}'"
    ```
-
-2. **Testing SQL Injection**:
-   - Login with username: `' OR 1=1 --`
-   - See database contents directly in the UI
-
-## SQL Injection Testing Guide
-
-To test the SQL injection vulnerabilities:
-
-1. **Login Form Injection:**
-   ```
-   ' OR 1=1 --
-   ```
-   This will log you in as the first user in the database without knowing the password.
-
-2. **Union-Based Attacks in Registration:**
-   ```
-   ' UNION SELECT 1,database(),'x','y'--
-   ```
-   This will return the database name in the registration response.
-
-3. **Customer Management Injection:**
-   ```
-   '; INSERT INTO customers VALUES (NULL, 'Injected Customer', 'Basic Package', 'North', NOW()); --
-   ```
-   This will add a new customer through SQL injection.
-
+   
 ## XSS Vulnerability Testing Guide
 
 To test the XSS vulnerabilities:
