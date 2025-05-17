@@ -54,8 +54,10 @@ function App() {
 
   // Handle navigation
   const navigate = (path) => {
-    window.history.pushState({}, '', path);
-    setCurrentPath(path);
+    if (currentPath !== path) {
+      window.history.pushState({}, '', path);
+      setCurrentPath(path);
+    }
   };
 
   // Override the default behavior of anchor tags
@@ -82,6 +84,10 @@ function App() {
       setMessage("");
       setErrorDetails("");
       
+      // Clear any existing tokens
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      
       // Send login request to backend
       const response = await fetch(`${config.apiUrl}/login`, {
         method: "POST",
@@ -103,35 +109,26 @@ function App() {
         throw new Error("parse_error");
       });
       
-      // Handle different response status codes
-      if (response.ok) {
+      // IMPORTANT FIX: Check the status field from the JSON response
+      // This handles cases where the backend returns 200 OK even for errors
+      if (data.status === "success" && data.access_token) {
         // Login successful
-        auth.login({ username }, data.access_token);
+        await auth.login({ username }, data.access_token);
+        
+        // Store auth token in localStorage
+        localStorage.setItem('auth_token', data.access_token);
+        localStorage.setItem('auth_user', JSON.stringify({ username }));
+        
+        // Set message
         setMessage(data.message || "Login successful");
-      } else {
-        // Handle different error status codes
-        switch (response.status) {
-          case 400:
-            setMessage(`Validation error: ${data.message || data.detail || "Invalid input"}`);
-            break;
-          case 401:
-            setMessage(`Authentication failed: ${data.message || data.detail || "Invalid username or password"}`);
-            break;
-          case 403:
-            setMessage(`Account locked: ${data.message || data.detail || "Your account is locked"}`);
-            break;
-          case 429:
-            setMessage(`Too many attempts: ${data.message || data.detail || "Please try again later"}`);
-            break;
-          case 500:
-            setMessage(`Server error: ${data.message || data.detail || "Something went wrong"}`);
-            if (data.traceback) {
-              setErrorDetails(data.traceback);
-            }
-            break;
-          default:
-            setMessage(`Error: ${data.message || data.detail || "Unknown error occurred"}`);
+        
+        // Navigate to dashboard
+        if (currentPath === '/' || currentPath === '/login') {
+          navigate('/dashboard');
         }
+      } else {
+        // Login failed - data.status is "error"
+        setMessage(data.message || "Authentication failed");
       }
     } catch (error) {
       // Only set message if we haven't already handled the specific error
@@ -142,6 +139,19 @@ function App() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    // Clear auth state
+    auth.logout();
+    
+    // Remove stored tokens
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    
+    // Navigate to login page
+    navigate('/');
   };
 
   // Login component
@@ -228,10 +238,10 @@ function App() {
   if (auth.isAuthenticated) {
     switch (currentPath) {
       case '/change-password':
-        return <ChangePassword />;
+        return <ChangePassword onLogout={handleLogout} />;
       case '/dashboard':
       default:
-        return <CustomerManagement successMessage={successMessage} />;
+        return <CustomerManagement successMessage={successMessage} onLogout={handleLogout} />;
     }
   } else {
     // If not authenticated, show login or registration pages
