@@ -195,119 +195,80 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
     if not data.username or not data.password:
         return {"status": "error", "message": "Username and password are required"}
 
-    # Get user's IP address for logging
     client_ip = request.client.host if request.client else "unknown"
     
-    # Check if IP is locked due to too many failed attempts
+    # Check if IP is locked
     is_locked_ip, lock_message_ip = is_ip_locked(client_ip, db)
     if is_locked_ip:
-        # Record the attempt
         record_login_attempt(data.username, False, client_ip, db)
         return {"status": "error", "message": lock_message_ip}
     
     try:
         cursor = db.cursor()
-        
-        # VULNERABLE: Direct string concatenation in query
+        # Vulnerable SQL query with direct string concatenation
         query = "SELECT * FROM users WHERE username = '" + data.username + "'"
-        
-        # Log the actual query for debugging
         print(f"Executing query: {query}")
-        
-        # Execute the query
         cursor.execute(query)
         result = cursor.fetchall()
         
-        raw_results = []
-        for row in result:
-            # Convert each row to a raw string representation
-            raw_row = "{"
-            for key, value in row.items():
-                # Handle different data types for display
-                if isinstance(value, str):
-                    raw_row += f"'{key}': '{value}', "
-                elif value is None:
-                    raw_row += f"'{key}': NULL, "
-                else:
-                    raw_row += f"'{key}': {value}, "
-            raw_row = raw_row.rstrip(", ") + "}"
-            raw_results.append(raw_row)
-        
-        # Combine all rows into a single raw output string
-        raw_output = "Results:\n" + "\n".join(raw_results)
-        
-        # No user found
-        if not result:
-            # Record failed attempt
+        # No users found
+        if len(result) == 0:
             record_login_attempt(data.username, False, client_ip, db)
+            return {"status": "error", "message": "Invalid username or password"}
+        
+        # Exactly one user found
+        elif len(result) == 1:
+            user = result[0]
+            # Check if account is locked
+            is_locked, lock_message = is_account_locked(user['id'], db)
+            if is_locked:
+                record_login_attempt(data.username, False, client_ip, db)
+                return {"status": "error", "message": lock_message}
             
-            # Return raw SQL info even when no results are found
-            return {"status": "error", "message": f"No results found."}
-            
-        # If multiple users found - classic sign of SQL injection
-        if len(result) > 1:
-            # Record the attempt
+            # Verify password
+            if verify_password(data.password, user['password'], db):
+                record_login_attempt(data.username, True, client_ip, db)
+                reset_failed_attempts(user['id'], db)
+                access_token = create_access_token(
+                    data={"sub": user['username']},
+                    expires_delta=timedelta(minutes=60),
+                    db_connection=db
+                )
+                return {
+                    "status": "success",
+                    "message": "Login successful",
+                    "access_token": access_token,
+                    "token_type": "bearer"
+                }
+            else:
+                record_login_attempt(data.username, False, client_ip, db)
+                increment_failed_attempts(user['id'], db)
+                return {"status": "error", "message": "Invalid username or password"}
+        
+        # Multiple users found (SQL injection)
+        else:
             record_login_attempt(data.username, False, client_ip, db)
-            
+            raw_results = []
+            for row in result:
+                raw_row = "{"
+                for key, value in row.items():
+                    if isinstance(value, str):
+                        raw_row += f"'{key}': '{value}', "
+                    elif value is None:
+                        raw_row += f"'{key}': NULL, "
+                    else:
+                        raw_row += f"'{key}': {value}, "
+                raw_row = raw_row.rstrip(", ") + "}"
+                raw_results.append(raw_row)
+            raw_output = "Results:\n" + "\n".join(raw_results)
             return {
-                "status": "error", 
-                "message": f"{query}\ {len(result)}\n{raw_output[:500]}"
+                "status": "error",
+                "message": f"Multiple users found: {len(result)}\n{raw_output[:500]}"
             }
-            
-        # Select first user for authentication
-        user = result[0]
-            
+    
     except Exception as e:
-        # Record the failed attempt
         record_login_attempt(data.username, False, client_ip, db)
-        # Intentionally leaking error details that might contain DB schema info
-        return {"status": "error", "message": f"[SQL Error] {str(e)}\nQuery: {query}"}
-    
-    # Check if account is locked
-    try:
-        is_locked, lock_message = is_account_locked(user['id'], db)
-        if is_locked:
-            # Record the attempt
-            record_login_attempt(data.username, False, client_ip, db)
-            return {"status": "error", "message": lock_message}
-    except Exception as e:
-        print(f"Error checking if account is locked: {str(e)}")
-    
-    # Normal password verification
-    try:
-        password_correct = verify_password(data.password, user['password'], db)
-    except Exception as e:
-        password_correct = False
-    
-    if not password_correct:
-        # Record failed attempt and increment counter
-        record_login_attempt(data.username, False, client_ip, db)
-        increment_failed_attempts(user['id'], db)
-        
-        # Even with incorrect password, expose raw SQL data
-        return {"status": "error", "message": f"[SQL] Authentication failed.\nQuery: {query}\n{raw_output[:500]}"}
-    
-    # Login successful - reset failed attempts and record success
-    try:
-        record_login_attempt(data.username, True, client_ip, db)
-        reset_failed_attempts(user['id'], db)
-    except Exception as e:
-        print(f"Error recording successful login: {str(e)}")
-    
-    # Create access token with username as subject
-    access_token = create_access_token(
-        data={"sub": user['username']},
-        expires_delta=timedelta(minutes=60),  # Token valid for 1 hour
-        db_connection=db
-    )
-    
-    # Return successful login
-    return {
-        "status": "success",
-        "message": "Login successful",
-        "access_token": access_token, 
-        "token_type": "bearer"
-    }
+        return {"status": "error", "message": f"SQL Error: {str(e)}\nQuery: {query}"}
 
 @app.post("/register")
 def register(data: RegisterData, db = Depends(get_db)):
