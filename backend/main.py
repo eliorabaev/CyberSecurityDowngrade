@@ -272,14 +272,15 @@ def login(data: LoginData, request: Request, db = Depends(get_db)):
 
 @app.post("/register")
 def register(data: RegisterData, db = Depends(get_db)):
-    # Basic validation
+    # Basic validation: ensure all fields are provided
     if not data.username or not data.email or not data.password:
         return {"status": "error", "message": "All fields are required"}
     
-    # Email format validation
+    # Validate email format
     if not is_valid_email(data.email):
         return {"status": "error", "message": "Invalid email format"}
     
+    # Validate password strength
     is_valid, password_msg = validate_password(data.password)
     if not is_valid:
         return {"status": "error", "message": password_msg}
@@ -287,33 +288,29 @@ def register(data: RegisterData, db = Depends(get_db)):
     cursor = db.cursor()
     
     try:
-        # VULNERABLE: Direct string concatenation in query
-        # This query is constructed in a way that UNION attacks can work
+        # Vulnerable query: check if username exists using direct string concatenation
         query = "SELECT * FROM users WHERE username = '" + data.username + "'"
-        
         cursor.execute(query)
         result = cursor.fetchall()
         
-        # Check if user exists by username
-        if result and len(result) > 0:
-            # The key vulnerability: this will return data from UNION queries
-            row_data = str(result[0])
-            return {"status": "error", "message": f"User already exists: {row_data[:100]}"}
+        # If any rows are returned, show them in the response (vulnerable to UNION injections)
+        if result:
+            raw_results = [str(row) for row in result]
+            message = f"Cannot register: username conflict with existing data\n" + "\n".join(raw_results)
+            return {"status": "error", "message": message}
         
-        # Check if email exists (using parameterized query for this check)
+        # Secure query: check if email is already in use
         cursor.execute("SELECT * FROM users WHERE email = %s", (data.email,))
         if cursor.fetchone():
             return {"status": "error", "message": "Email already in use"}
         
-        # Insert new user with properly hashed password
+        # Vulnerable insert: direct string concatenation for username and email
         hashed_password = hash_password(data.password, db)
-        
-        # Another vulnerability in the insert query
         insert_query = f"INSERT INTO users (username, email, password) VALUES ('{data.username}', '{data.email}', '{hashed_password}')"
         cursor.execute(insert_query)
         db.commit()
         
-        # Get the ID of the new user
+        # Retrieve the new user's ID
         cursor.execute("SELECT id FROM users WHERE username = %s", (data.username,))
         new_user = cursor.fetchone()
         user_id = new_user['id'] if new_user else None
@@ -322,11 +319,11 @@ def register(data: RegisterData, db = Depends(get_db)):
             add_password_to_history(user_id, hashed_password, db)
         
         return {"status": "success", "message": "Registration successful", "user_id": user_id}
-        
-    except Exception as e:
-        # Error message includes the exception which may contain SQL info
-        return {"status": "error", "message": f"Registration error: {str(e)}"}
     
+    except Exception as e:
+        # Expose SQL error details in the response
+        return {"status": "error", "message": f"Registration error: {str(e)}"}
+        
 @app.post("/forgot-password")
 def forgot_password(data: ForgotPasswordRequest, db = Depends(get_db)):
     """Initiate password reset process by sending a reset token via email"""
