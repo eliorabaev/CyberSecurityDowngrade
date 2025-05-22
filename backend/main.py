@@ -744,6 +744,21 @@ def initialize_application():
             """)
             db.commit()
             print("Created admin user with secure password")
+
+        # Create test user if it doesn't exist
+        cursor.execute("SELECT * FROM users WHERE username = 'test1'")
+        test_exists = cursor.fetchone()
+
+        if not test_exists:
+            # Create test user with hashed password
+            hashed_password = hash_password("test", db)
+            escaped_password = escape_string(hashed_password)
+            cursor.execute(f"""
+                INSERT INTO users (username, email, password)
+                VALUES ('test1', 'test@example.com', '{escaped_password}')
+            """)
+            db.commit()
+            print("Created test1 user with secure password")
     finally:
         db.close()
 
