@@ -637,23 +637,20 @@ def verify_reset_token(data: VerifyTokenRequest, db = Depends(get_db)):
 
 @app.post("/customers", response_model=MessageResponse)
 def add_customer(data: CustomerData, current_user = Depends(get_current_user), db = Depends(get_db)):
-    # Create new customer without sanitization - Vulnerable to SQL Injection and XSS
-    # For this educational endpoint, we're keeping both XSS and SQL injection vulnerabilities
     try:
         cursor = db.cursor()
-        # Intentionally vulnerable with direct string concatenation
-        query = f"""
+        query = """
             INSERT INTO customers (name, internet_package, sector)
-            VALUES ('{data.name}', '{data.internet_package}', '{data.sector}')
+            VALUES (%s, %s, %s)
         """
-        print(f"Executing query: {query}")  # Debug print
-        cursor.execute(query)
+        cursor.execute(query, (data.name, data.internet_package, data.sector))
         db.commit()
     except Exception as e:
         print(f"SQL Error: {str(e)}")
         raise
     
     return {"message": "Customer added successfully"}
+
 
 @app.get("/customers", response_model=CustomerListResponse)
 def get_customers(current_user = Depends(get_current_user), db = Depends(get_db)):

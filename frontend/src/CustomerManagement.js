@@ -80,7 +80,7 @@ function CustomerManagement({ successMessage }) {
 
   // Helper function to unsafely render HTML (vulnerable to XSS)
   const createUnsafeDisplay = (str) => {
-    return <span dangerouslySetInnerHTML={{ __html: str }} />;
+    return <div dangerouslySetInnerHTML={{ __html: str }} />;
   };
 
   // Handle form submission
