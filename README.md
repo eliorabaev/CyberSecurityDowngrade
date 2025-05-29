@@ -206,7 +206,7 @@ The Customer Management features have been deliberately modified to remove outpu
    ```
 
 2. **Testing XSS**:
-   - Add a new customer with name: `<script>alert('XSS Attack!')</script>`
+   - Add a new customer with name: `<img src="x" onerror="alert('XSS')">`
    - View the customer list to see the script execute
 
 ### SQL Injection Vulnerability
@@ -225,7 +225,7 @@ To test the XSS vulnerabilities:
 
 1. **Basic Alert Script:**
    ```html
-   <script>alert('XSS Attack')</script>
+   <img src="x" onerror="alert('XSS')">
    ```
 
 2. **Cookie Stealing (Demonstration Only):**
