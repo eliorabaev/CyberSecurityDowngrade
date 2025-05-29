@@ -649,7 +649,7 @@ def add_customer(data: CustomerData, current_user = Depends(get_current_user), d
         print(f"SQL Error: {str(e)}")
         raise
     
-    return {"message": "Customer added successfully"}
+    return {"message": f"Customer '{data.name}' added successfully"}
 
 
 @app.get("/customers", response_model=CustomerListResponse)
