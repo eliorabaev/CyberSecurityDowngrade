@@ -436,6 +436,10 @@ def reset_password(data: ResetPasswordRequest, db = Depends(get_db)):
     
     if not user:
         return {"status": "error", "message": "User not found"}
+
+    is_valid, password_msg = validate_password(data.new_password)
+    if not is_valid:
+        return {"status": "error", "message": password_msg}
     
     # Validate the new password - only check if it's in history
     is_valid_password = True
