@@ -76,14 +76,12 @@ function ForgotPassword() {
       const data = await response.json();
       
       // Use data.status from our updated backend
-      if (data.status === "success") {
-        setMessage(data.message || "Token verified successfully");
-        setVerifiedToken(token); // Store the verified token
-        // Move to new password step
-        setCurrentStep("password");
+      if (response.ok && (data.status === "success" || data.message)) {
+      setMessage(data.message || "Token verified successfully");
+      setVerifiedToken(token);
+      setCurrentStep("password");
       } else {
-        // Display error message from backend (which might contain SQLI data)
-        setMessage(data.message || "Invalid verification code");
+          setMessage(data.message || "Invalid verification code");
       }
     } catch (error) {
       // Expose detailed error information
