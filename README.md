@@ -172,6 +172,17 @@ This includes checking:
 │ React Frontend  │◄────►│ FastAPI Backend  │◄────►│  MySQL Database  │
 │                 │      │                  │      │                  │
 └─────────────────┘      └──────────────────┘      └──────────────────┘
+       ▲                         ▲                        ▲
+       │                         │                        │
+       │                         │                        │
+       │     ┌──────────────┐    │                        │
+       └────►│   JWT Auth   │◄───┘                        │
+             │              │                             │
+             └──────────────┘                             │
+                                    ┌──────────────────┐  │
+                                    │   Secure Salt &  │◄─┘
+                                    │   JWT Secrets    │
+                                    └──────────────────┘
 ```
 
 ## Technology Stack
