@@ -330,47 +330,43 @@ def register(data: RegisterData, db = Depends(get_db)):
 @app.post("/forgot-password")
 def forgot_password(data: ForgotPasswordRequest, db = Depends(get_db)):
     """Initiate password reset process by sending a reset token via email"""
-    # Basic validation
-    if not data.email:
-        return {"status": "error", "message": "Email is required"}
+    # Validate email input
+    from validation_utils import validate_email
+    is_valid, error_message = validate_email(data.email)
+    if not is_valid:
+        return {"status": "error", "message": error_message}
     
     cursor = db.cursor()
     
     try:
-        # VULNERABLE: Direct string concatenation in email lookup
-        query = "SELECT * FROM users WHERE email = '" + data.email + "'"
-        cursor.execute(query)
+        # SECURE: Use parameterized query to prevent SQL injection
+        query = "SELECT * FROM users WHERE email = %s"
+        cursor.execute(query, (data.email,))
         user = cursor.fetchone()
         
-        # Check for SQL injection pattern revealing multiple users
-        result = cursor.fetchall()
-        if len(result) > 0:
-            # VULNERABLE: Leaks data from the query in the error message
-            row_data = str(result[0])
-            return {"status": "error", "message": f"Error processing request: {row_data[:100]}"}
-            
     except Exception as e:
-        # VULNERABLE: Returns database error details to the client
-        return {"status": "error", "message": f"Database error: {str(e)}"}
+        # SECURE: Don't leak database error details
+        print(f"Database error in forgot_password: {str(e)}")  # Log for debugging
+        return {"status": "error", "message": "An error occurred processing your request"}
     
     # Generate token
     reset_token = generate_reset_token()
     
     if user:
         try:
-            # Expire any existing tokens
-            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
-            # VULNERABLE: Another string concatenation
-            expire_query = "UPDATE password_reset_tokens SET is_used = 1 WHERE user_id = " + str(user['id']) + " AND is_used = 0"
-            cursor.execute(expire_query)
+            # SECURE: Use parameterized query to expire existing tokens
+            expire_query = "UPDATE password_reset_tokens SET is_used = 1 WHERE user_id = %s AND is_used = 0"
+            cursor.execute(expire_query, (user['id'],))
             
             # Create new token with 20-minute expiration
-            token_expiry = (datetime.now() + timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S')
+            token_expiry = datetime.now() + timedelta(minutes=20)
             
-            # VULNERABLE: More string concatenation
-            insert_query = "INSERT INTO password_reset_tokens (user_id, email, token, expires_at) VALUES (" + str(user['id']) + ", '" + data.email + "', '" + reset_token + "', '" + token_expiry + "')"
-            cursor.execute(insert_query)
+            # SECURE: Use parameterized query for insert
+            insert_query = """
+                INSERT INTO password_reset_tokens (user_id, email, token, expires_at) 
+                VALUES (%s, %s, %s, %s)
+            """
+            cursor.execute(insert_query, (user['id'], data.email, reset_token, token_expiry))
             db.commit()
             
             # Send email with token
@@ -379,99 +375,103 @@ def forgot_password(data: ForgotPasswordRequest, db = Depends(get_db)):
             except Exception as e:
                 print(f"Email error: {str(e)}")
                 # Still commit the token to database even if email fails
+                
         except Exception as e:
-            # VULNERABLE: Leaks more database info in the error
-            return {"status": "error", "message": f"Error creating reset token: {str(e)}"}
+            # SECURE: Don't leak database info in the error
+            print(f"Error creating reset token: {str(e)}")  # Log for debugging
+            return {"status": "error", "message": "An error occurred processing your request"}
     
-    # Return generic message for security
+    # Return generic message for security (don't indicate if email exists)
     return {"status": "success", "message": "If an account with this email exists, a password reset link has been sent."}
 
 @app.post("/reset-password")
 def reset_password(data: ResetPasswordRequest, db = Depends(get_db)):
     """Reset password using the token sent via email"""
-    # Basic validation
+    # Validate all required fields
     if not data.email or not data.token or not data.new_password:
         return {"status": "error", "message": "All fields are required"}
+    
+    # Validate email format
+    from validation_utils import validate_email
+    is_valid_email, email_error = validate_email(data.email)
+    if not is_valid_email:
+        return {"status": "error", "message": email_error}
     
     cursor = db.cursor()
     
     try:
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now = datetime.now()
         
-        # VULNERABLE: Direct string concatenation in query
-        query = f"""
+        # SECURE: Use parameterized query to find token
+        query = """
             SELECT * FROM password_reset_tokens 
-            WHERE email = '{data.email}' 
-            AND token = '{data.token}' 
+            WHERE email = %s 
+            AND token = %s 
             AND is_used = 0 
-            AND expires_at > '{now}'
+            AND expires_at > %s
         """
-        
-        cursor.execute(query)
+        cursor.execute(query, (data.email, data.token, now))
         token_record = cursor.fetchone()
         
-        # Check if multiple records were found (potential SQL injection)
-        result = cursor.fetchall()
-        if len(result) > 0:
-            # VULNERABLE: Leaks data in the error message
-            row_data = str(result[0])
-            return {"status": "error", "message": f"Token validation error: {row_data[:100]}"}
-            
     except Exception as e:
-        # VULNERABLE: Exposes database error details
-        return {"status": "error", "message": f"Token validation error: {str(e)}"}
+        # SECURE: Don't leak database error details
+        print(f"Token validation error: {str(e)}")  # Log for debugging
+        return {"status": "error", "message": "An error occurred processing your request"}
     
     if not token_record:
         return {"status": "error", "message": "Invalid or expired reset token"}
     
     # Find the user associated with this token
     try:
-        # VULNERABLE: Another string concatenation
-        user_query = "SELECT * FROM users WHERE id = " + str(token_record['user_id'])
-        cursor.execute(user_query)
+        # SECURE: Use parameterized query for user lookup
+        user_query = "SELECT * FROM users WHERE id = %s"
+        cursor.execute(user_query, (token_record['user_id'],))
         user = cursor.fetchone()
     except Exception as e:
-        # VULNERABLE: More error details exposed
-        return {"status": "error", "message": f"User lookup error: {str(e)}"}
+        # SECURE: Don't expose error details
+        print(f"User lookup error: {str(e)}")  # Log for debugging
+        return {"status": "error", "message": "An error occurred processing your request"}
     
     if not user:
         return {"status": "error", "message": "User not found"}
 
+    # Validate the new password
     is_valid, password_msg = validate_password(data.new_password)
     if not is_valid:
         return {"status": "error", "message": password_msg}
     
-    # Validate the new password - only check if it's in history
-    is_valid_password = True
+    # Validate the new password against history
     try:
         is_valid_password = check_password_history(user['id'], data.new_password, db)
+        if not is_valid_password:
+            return {"status": "error", "message": f"Cannot reuse one of your last {config.PASSWORD_HISTORY_LENGTH} passwords"}
     except Exception as e:
-        # VULNERABLE: Exposes internal validation details
-        return {"status": "error", "message": f"Password validation error: {str(e)}"}
-    
-    if not is_valid_password:
-        return {"status": "error", "message": f"Cannot reuse one of your last {config.PASSWORD_HISTORY_LENGTH} passwords"}
+        # SECURE: Don't expose internal validation details
+        print(f"Password history validation error: {str(e)}")  # Log for debugging
+        return {"status": "error", "message": "An error occurred validating your password"}
     
     # Hash the new password
     try:
         hashed_password = hash_password(data.new_password, db)
     except Exception as e:
-        return {"status": "error", "message": f"Password hashing error: {str(e)}"}
+        print(f"Password hashing error: {str(e)}")  # Log for debugging
+        return {"status": "error", "message": "An error occurred processing your request"}
     
     # Update user's password
     try:
-        # VULNERABLE: String concatenation again
-        update_query = "UPDATE users SET password = '" + hashed_password + "' WHERE id = " + str(user['id'])
-        cursor.execute(update_query)
+        # SECURE: Use parameterized query for password update
+        update_query = "UPDATE users SET password = %s WHERE id = %s"
+        cursor.execute(update_query, (hashed_password, user['id']))
     except Exception as e:
-        # VULNERABLE: SQL error details leaked
-        return {"status": "error", "message": f"Password update error: {str(e)}"}
+        # SECURE: Don't leak SQL error details
+        print(f"Password update error: {str(e)}")  # Log for debugging
+        return {"status": "error", "message": "An error occurred updating your password"}
     
     # Mark token as used
     try:
-        # VULNERABLE: Yet another string concatenation
-        token_query = "UPDATE password_reset_tokens SET is_used = 1 WHERE id = " + str(token_record['id'])
-        cursor.execute(token_query)
+        # SECURE: Use parameterized query for token update
+        token_query = "UPDATE password_reset_tokens SET is_used = 1 WHERE id = %s"
+        cursor.execute(token_query, (token_record['id'],))
     except Exception as e:
         print(f"Error marking token as used: {str(e)}")
         # Continue even if this fails - no return here
