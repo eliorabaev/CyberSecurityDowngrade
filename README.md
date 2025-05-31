@@ -33,17 +33,7 @@ This version is intended solely for:
 - Vulnerability testing practice
 - Understanding the impact of common web vulnerabilities
 
-## Quick Start
-
-⚠️ **Important Note for Users from the Original Repository**: If you're coming from the original repository at https://github.com/eliorabaev/CyberSecurity, you need to run the following command to properly rebuild the project with the vulnerable version:
-
-```bash
-docker compose down -v && docker compose up --build
-```
-
-This ensures all volumes are removed and the project is rebuilt from scratch with the vulnerable code.
-
-For new installations:
+## ⚡ Quick Start
 
 ```bash
 # Clone the repository
@@ -57,8 +47,8 @@ cd backend && cp .env.example .env
 # Replace your_actual_api_key_here with your key
 sed -i 's/enter_your_api_key_here/your_actual_api_key_here/' .env
 
-# Start backend services
-docker-compose up -d
+# Start backend services (remove any volumes and rebuild the images - in case you are coming from the safe version)
+docker compose down -v && docker compose up --build -d
 
 # Start the frontend
 cd ../frontend && cp .env.example .env && npm install && npm start
