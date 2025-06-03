@@ -514,8 +514,7 @@ def change_password(data: ChangePasswordData, current_user = Depends(get_current
             status_code=400,
             content={
                 "status": "error",
-                "message": password_msg,
-                "sql_injection_results": injection_results if 'injection_results' in locals() else []
+                "message": password_msg
             }
         )
     
@@ -529,47 +528,21 @@ def change_password(data: ChangePasswordData, current_user = Depends(get_current
             }
         )
     
-    # For SQL Injection demonstration, let's create a vulnerable version of the update query
-    # We'll demonstrate SQL injection possibility in the new password field
-    injection_results = []
-    try:
-        # Intentionally vulnerable query using string concatenation with the new password
-        test_query = f"SELECT * FROM users WHERE id = {current_user['id']} AND password LIKE '{data.newPassword}%'"
-        print(f"Executing test query: {test_query}")  # Debug print
-        cursor = db.cursor()
-        cursor.execute(test_query)
-        result = cursor.fetchall()
-        
-        # Store results for returning to client
-        for row in result:
-            # Convert datetime objects to strings to make them JSON serializable
-            serializable_row = {}
-            for key, value in row.items():
-                if isinstance(value, datetime):
-                    serializable_row[key] = value.isoformat()
-                else:
-                    serializable_row[key] = value
-            injection_results.append(serializable_row)
-    except Exception as e:
-        print(f"SQL Injection test error: {str(e)}")
-        injection_results = [{"error": str(e)}]
-    
-    # Update password with new hash - Escaped to prevent syntax errors in the actual update
+    # SECURE: Update password using parameterized query
     try:
         new_hashed_password = hash_password(data.newPassword, db)
-        escaped_password = escape_string(new_hashed_password)
         cursor = db.cursor()
-        query = f"UPDATE users SET password = '{escaped_password}' WHERE id = {current_user['id']}"
-        print(f"Executing query: {query}")  # Debug print
-        cursor.execute(query)
+        # Use parameterized query to prevent SQL injection
+        query = "UPDATE users SET password = %s WHERE id = %s"
+        cursor.execute(query, (new_hashed_password, current_user['id']))
+        print(f"Password updated for user ID: {current_user['id']}")  # Safe debug print
     except Exception as e:
         print(f"SQL Error: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": f"Failed to update password: {str(e)}",
-                "sql_injection_results": injection_results
+                "message": "Failed to update password due to a database error"
             }
         )
     
@@ -584,8 +557,7 @@ def change_password(data: ChangePasswordData, current_user = Depends(get_current
     
     return {
         "status": "success",
-        "message": "Password changed successfully",
-        "sql_injection_results": injection_results
+        "message": "Password changed successfully"
     }
 
 
@@ -597,40 +569,37 @@ def verify_reset_token(data: VerifyTokenRequest, db = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email and verification code are required")
     
     cursor = db.cursor()
-    # Find the token - Vulnerable to SQL Injection (intentionally)
+    # SECURE: Find the token using parameterized query
     try:
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # Remove any backslash escapes
-        email = remove_backslash_escapes(data.email)
-        token = remove_backslash_escapes(data.token)
+        now = datetime.now()
         
-        # This query is intentionally vulnerable to SQL injection
-        raw_query = f"""
+        # Use parameterized query to prevent SQL injection
+        query = """
             SELECT * FROM password_reset_tokens 
-            WHERE email = '{email}' 
-            AND token = '{token}' 
+            WHERE email = %s 
+            AND token = %s 
             AND is_used = 0 
-            AND expires_at > '{now}'
+            AND expires_at > %s
         """
-        print(f"Executing query: {raw_query}")  # Debug print
-        cursor.execute(raw_query)
+        print(f"Executing secure token verification query")  # Safe debug print
+        cursor.execute(query, (data.email, data.token, now))
         token_record = cursor.fetchone()
     except Exception as e:
-        print(f"SQL Error: {str(e)}")
-        raise
+        print(f"Database error during token verification: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred during verification")
     
     if not token_record:
         raise HTTPException(status_code=400, detail="Invalid or expired verification code")
     
-    # Find the user associated with this token
+    # SECURE: Find the user associated with this token using parameterized query
     try:
-        query = f"SELECT * FROM users WHERE id = {token_record['user_id']}"
-        print(f"Executing query: {query}")  # Debug print
-        cursor.execute(query)
+        query = "SELECT * FROM users WHERE id = %s"
+        print(f"Executing secure user lookup query")  # Safe debug print
+        cursor.execute(query, (token_record['user_id'],))
         user = cursor.fetchone()
     except Exception as e:
-        print(f"SQL Error: {str(e)}")
-        raise
+        print(f"Database error during user lookup: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred during verification")
     
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
@@ -643,28 +612,40 @@ def verify_reset_token(data: VerifyTokenRequest, db = Depends(get_db)):
 def add_customer(data: CustomerData, current_user = Depends(get_current_user), db = Depends(get_db)):
     try:
         cursor = db.cursor()
-        query = """
-            INSERT INTO customers (name, internet_package, sector)
-            VALUES (%s, %s, %s)
-        """
-        cursor.execute(query, (data.name, data.internet_package, data.sector))
+        # VULNERABLE: Direct string concatenation without parameterization
+        query = f"INSERT INTO customers (name, internet_package, sector) VALUES ('{data.name}', '{data.internet_package}', '{data.sector}')"
+        print(f"Executing query: {query}")  # Debug print
+        cursor.execute(query)
         db.commit()
     except Exception as e:
         print(f"SQL Error: {str(e)}")
-        raise
+        # Return error with SQL details for educational purposes
+        return {"message": f"Customer addition failed: {str(e)}\nQuery: {query}"}
     
     return {"message": f"Customer '{data.name}' added successfully"}
 
 
 @app.get("/customers", response_model=CustomerListResponse)
-def get_customers(current_user = Depends(get_current_user), db = Depends(get_db)):
+def get_customers(current_user = Depends(get_current_user), db = Depends(get_db), filter: Optional[str] = None):
     try:
         cursor = db.cursor()
-        cursor.execute("SELECT * FROM customers")
+        
+        if filter:
+            # VULNERABLE: Direct string concatenation for filtering
+            query = f"SELECT * FROM customers WHERE name LIKE '%{filter}%' OR sector LIKE '%{filter}%'"
+            print(f"Executing query: {query}")  # Debug print
+            cursor.execute(query)
+        else:
+            # Safe query when no filter is provided
+            cursor.execute("SELECT * FROM customers")
+            
         customers = cursor.fetchall()
     except Exception as e:
         print(f"SQL Error: {str(e)}")
-        raise
+        return {
+            "customers": [],
+            "message": f"Database error: {str(e)}\nQuery: {query if 'query' in locals() else 'SELECT * FROM customers'}"
+        }
     
     # Convert datetime to string for serialization
     customer_responses = []
@@ -677,7 +658,6 @@ def get_customers(current_user = Depends(get_current_user), db = Depends(get_db)
             "date_added": customer['date_added'].strftime("%Y-%m-%d")
         })
     
-    # Return in format matching CustomerListResponse
     return {"customers": customer_responses}
 
 # Endpoint to get current user info
